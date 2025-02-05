@@ -35,9 +35,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-gray-900">
-        {/* Fixed Header */}
         <header className="fixed top-0 left-0 right-0 z-50 bg-black shadow-lg">
-          {/* Logo Section */}
           <div className="flex justify-center py-3">
             <svg className="h-8" viewBox="0 0 557 212" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M78.17 209.15H52.32L0 68.85h37.28l30.46 91h.2l32.67-91h35.88l-58.32 140.3Z" fill="#fff"/>
@@ -49,7 +47,6 @@ function App() {
             </svg>
           </div>
           
-          {/* Menu Section */}
           <div className="grid grid-cols-5 divide-x divide-gray-700 border-t border-gray-700">
             <button
               onClick={toggleLanguage}
@@ -103,7 +100,6 @@ function App() {
           </div>
         </header>
         
-        {/* Main Content - Add padding-top to account for fixed header */}
         <main className="flex-1 pt-[116px]">
           <Routes>
             <Route path="/" element={<Map session={session} language={language} />} />

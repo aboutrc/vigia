@@ -60,6 +60,19 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     fetchRecordings();
   }, []);
 
+  const getRecordingUrl = async (path: string) => {
+    try {
+      const { data } = await supabase.storage
+        .from('recordings')
+        .getPublicUrl(path);
+      
+      return data.publicUrl;
+    } catch (err) {
+      console.error('Error getting public URL:', err);
+      return null;
+    }
+  };
+
   const fetchRecordings = async () => {
     try {
       const { data, error } = await supabase
@@ -68,7 +81,16 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRecordings(data || []);
+
+      // Get public URLs for all recordings
+      const recordingsWithUrls = await Promise.all(
+        (data || []).map(async (recording) => ({
+          ...recording,
+          publicUrl: await getRecordingUrl(recording.recording_url)
+        }))
+      );
+
+      setRecordings(recordingsWithUrls);
     } catch (err) {
       console.error('Error fetching recordings:', err);
       setError(t.errors.general);
@@ -240,15 +262,20 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                       {recording.location}
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      const audio = new Audio(recording.recording_url);
-                      audio.play();
-                    }}
-                    className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
-                  >
-                    <Play size={16} />
-                  </button>
+                  {recording.publicUrl && (
+                    <button
+                      onClick={() => {
+                        const audio = new Audio(recording.publicUrl);
+                        audio.play().catch(err => {
+                          console.error('Playback error:', err);
+                          setError(t.errors.audio.play);
+                        });
+                      }}
+                      className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
+                    >
+                      <Play size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
