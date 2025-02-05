@@ -56,7 +56,7 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
       if (geolocateControlRef.current) {
         (geolocateControlRef.current as any).trigger();
       }
-    }, 1500); // Increased delay to ensure map is fully loaded
+    }, 1500);
 
     return () => clearTimeout(timeoutId);
   }, []);
@@ -273,7 +273,11 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
           category: data.category,
           upvotes: data.marker_votes.length,
           createdAt: new Date(data.created_at),
-          user_id: data.user_id
+          user_id: data.user_id,
+          active: data.active,
+          lastConfirmed: data.last_confirmed,
+          confirmationsCount: data.confirmations_count,
+          lastStatusChange: data.last_status_change
         };
 
         setSelectedMarker(updatedMarker);
@@ -420,13 +424,45 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
                 closeButton={true}
                 closeOnClick={false}
                 anchor="bottom"
+                className="marker-popup"
               >
-                <div className="p-2">
-                  <div className="font-semibold text-gray-900">
+                <div className="p-4 min-w-[250px] bg-gray-900 text-gray-100 rounded-lg">
+                  <div className="font-semibold text-xl mb-3">
                     {t.categories[marker.category]}
                   </div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    {new Date(marker.createdAt).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}
+                  
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      {t.lastConfirmed}: {marker.lastConfirmed ? 
+                        new Date(marker.lastConfirmed).toLocaleString(language === 'es' ? 'es-ES' : 'en-US') : 
+                        'N/A'
+                      }
+                    </div>
+                    <div>
+                      {t.confirmations}: {marker.confirmationsCount || 0}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-between items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleConfirm(marker.id, true);
+                      }}
+                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors"
+                    >
+                      {t.stillPresent}
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleConfirm(marker.id, false);
+                      }}
+                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                    >
+                      {t.notPresent}
+                    </button>
                   </div>
                 </div>
               </Popup>
@@ -462,6 +498,7 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
               closeButton={true}
               closeOnClick={false}
               anchor="bottom"
+              className="marker-popup"
             >
               <MarkerForm
                 onSubmit={(formData) => handleMarkerSubmit(tempMarker.id, formData)}

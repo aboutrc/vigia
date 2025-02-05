@@ -9,9 +9,15 @@ export const translations = {
     search: 'Search locations...',
     youAreHere: 'You are here',
     stillPresent: 'Still Present',
-    resolved: 'Resolved',
+    notPresent: 'Not Present',
     stillHere: 'Still Here',
     lastConfirmed: 'Last confirmed',
+    confirmations: 'Confirmations',
+    markerAge: {
+      recent: 'Recent',
+      old: 'Over 4 hours old',
+      veryOld: 'Over 24 hours old'
+    },
     locationSearch: {
       placeholder: 'Search by city, state or zip code...',
       error: 'Location search failed'
@@ -134,9 +140,15 @@ export const translations = {
     search: 'Buscar ubicaciones...',
     youAreHere: 'Estás aquí',
     stillPresent: 'Aún Presente',
-    resolved: 'Resuelto',
+    notPresent: 'No Presente',
     stillHere: '¿Sigue Aquí?',
     lastConfirmed: 'Última confirmación',
+    confirmations: 'Confirmaciones',
+    markerAge: {
+      recent: 'Reciente',
+      old: 'Más de 4 horas',
+      veryOld: 'Más de 24 horas'
+    },
     locationSearch: {
       placeholder: 'Buscar por ciudad, estado o código postal...',
       error: 'Búsqueda de ubicación fallida'

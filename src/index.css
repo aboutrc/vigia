@@ -27,3 +27,25 @@
 .animate-progress {
   animation: progress 3s linear;
 }
+
+/* Custom popup styling */
+.marker-popup .maplibregl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden !important;
+}
+
+.marker-popup .maplibregl-popup-close-button {
+  padding: 0.5rem !important;
+  color: white !important;
+  font-size: 1.25rem !important;
+  right: 0.25rem !important;
+  top: 0.25rem !important;
+  z-index: 1 !important;
+}
+
+.marker-popup .maplibregl-popup-close-button:hover {
+  background: transparent !important;
+  color: #d1d5db !important;
+}
