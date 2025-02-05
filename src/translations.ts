@@ -13,11 +13,6 @@ export const translations = {
     stillHere: 'Still Here',
     lastConfirmed: 'Last confirmed',
     confirmations: 'Confirmations',
-    markerAge: {
-      recent: 'Recent',
-      old: 'Over 4 hours old',
-      veryOld: 'Over 24 hours old'
-    },
     locationSearch: {
       placeholder: 'Search by city, state or zip code...',
       error: 'Location search failed'
@@ -46,56 +41,22 @@ export const translations = {
     passwordPlaceholder: 'Password',
     createAccountTitle: 'Create your account',
     signInTitle: 'Sign in to your account',
-    rights: {
-      title: "Know Your Rights",
-      sections: {
-        constitution: {
-          title: "The U.S. Constitution Protects Everyone",
-          content: [
-            "Everyone in the U.S. is Protected by the U.S. Constitution—Citizen or Not.",
-            "The U.S. Constitution protects everyone that is physically in the U.S and is not meant for only citizens of the U.S.",
-            "These rights ensure fair treatment for all."
-          ]
-        },
-        amendments: {
-          title: "Important Constitutional Amendments",
-          content: [
-            "Fifth Amendment",
-            "• Right to stay quiet if talking might get you in trouble",
-            "• Everyone gets fair treatment by the law",
-            "",
-            "Fourth Amendment",
-            "• Police need a warrant, a judge's permission, to search you or your things",
-            "• A warrant is different from an ICE order: A warrant comes from a judge, while an ICE order does not",
-            "• Protects your privacy, including immigrants",
-            "",
-            "Fourteenth Amendment",
-            "• Everyone deserves fair legal processes",
-            "• Laws must treat everyone equally, giving the same rights to all"
-          ]
-        },
-        iceHome: {
-          title: "What Happens If ICE Comes to My Home",
-          content: [
-            "What to Do:",
-            "• You have the right to remain silent and do not have to discuss your immigration status",
-            "• Ask if they have a warrant signed by a judge. If they don't, you can refuse to let them in",
-            "• Stay calm and keep the door closed",
-            "• If they have a valid warrant, you may have to let them in, but you still have the right to remain silent and consult a lawyer",
-            "• Do not sign any documents without speaking to an attorney"
-          ]
-        },
-        iceStreet: {
-          title: "What Happens If ICE Approaches Me on the Street",
-          content: [
-            "What to Do:",
-            "• You have the right to remain silent and do not have to discuss your immigration status",
-            "• Ask if you are free to leave. If they say yes, calmly walk away",
-            "• You have the right to refuse to show identification or answer questions",
-            "• Remember, you do not have to sign any documents without speaking to an attorney"
-          ]
-        }
-      }
+    registro: {
+      title: "Record Encounter",
+      startRecording: "Start Recording",
+      stopRecording: "Stop Recording",
+      recordings: "Saved Recordings",
+      notifyRecording: "Notify Recording",
+      constitutionalRights: "Constitutional Rights",
+      badgeNumber: "Request Badge Number",
+      freeToGo: "Ask if Free to Go",
+      goodbye: "End Encounter",
+      location: "Location",
+      date: "Date",
+      time: "Time",
+      play: "Play Recording",
+      save: "Save Recording",
+      delete: "Delete Recording"
     },
     errors: {
       fetchMarkers: 'Unable to load markers. Please try again later.',
@@ -112,22 +73,6 @@ export const translations = {
         recording: 'Error accessing microphone. Please check permissions.',
         processing: 'Error processing audio. Please try again.'
       }
-    },
-    encounter: {
-      title: 'Real-time Translation',
-      listening: 'Listening...',
-      pressListen: 'Press the microphone button to start listening',
-      startListening: 'Start Listening',
-      stopListening: 'Stop Listening',
-      speak: 'Speak Translation',
-      loading: 'Loading...',
-      playSound: 'Play Sound',
-      stopSound: 'Stop Sound',
-      recordMessage: 'Record your message',
-      startRecording: 'Start Recording',
-      stopRecording: 'Stop Recording',
-      generateSpeech: 'Generate Speech',
-      processing: 'Processing...'
     }
   },
   es: {
@@ -144,11 +89,6 @@ export const translations = {
     stillHere: '¿Sigue Aquí?',
     lastConfirmed: 'Última confirmación',
     confirmations: 'Confirmaciones',
-    markerAge: {
-      recent: 'Reciente',
-      old: 'Más de 4 horas',
-      veryOld: 'Más de 24 horas'
-    },
     locationSearch: {
       placeholder: 'Buscar por ciudad, estado o código postal...',
       error: 'Búsqueda de ubicación fallida'
@@ -177,56 +117,22 @@ export const translations = {
     passwordPlaceholder: 'Contraseña',
     createAccountTitle: 'Crea tu cuenta',
     signInTitle: 'Inicia sesión en tu cuenta',
-    rights: {
-      title: "Conoce Tus Derechos",
-      sections: {
-        constitution: {
-          title: "La Constitución de EE.UU. Protege a Todos",
-          content: [
-            "Todos en los EE.UU. están protegidos por la Constitución—Ciudadanos o No.",
-            "La Constitución protege a todos los que están físicamente en los EE.UU. y no está destinada solo para ciudadanos.",
-            "Estos derechos garantizan un trato justo para todos."
-          ]
-        },
-        amendments: {
-          title: "Enmiendas Constitucionales Importantes",
-          content: [
-            "Quinta Enmienda",
-            "• Derecho a guardar silencio si hablar podría causarte problemas",
-            "• Todos reciben un trato justo por la ley",
-            "",
-            "Cuarta Enmienda",
-            "• La policía necesita una orden judicial, permiso de un juez, para registrarte o tus pertenencias",
-            "• Una orden judicial es diferente de una orden de ICE: Una orden judicial viene de un juez, mientras que una orden de ICE no",
-            "• Protege tu privacidad, incluyendo a los inmigrantes",
-            "",
-            "Decimocuarta Enmienda",
-            "• Todos merecen procesos legales justos",
-            "• Las leyes deben tratar a todos por igual, dando los mismos derechos a todos"
-          ]
-        },
-        iceHome: {
-          title: "Qué Hacer Si ICE Viene a Mi Casa",
-          content: [
-            "Qué Hacer:",
-            "• Tienes derecho a guardar silencio y no tienes que discutir tu estatus migratorio",
-            "• Pregunta si tienen una orden judicial firmada por un juez. Si no la tienen, puedes negarte a dejarlos entrar",
-            "• Mantén la calma y mantén la puerta cerrada",
-            "• Si tienen una orden judicial válida, puede que tengas que dejarlos entrar, pero aún tienes derecho a guardar silencio y consultar a un abogado",
-            "• No firmes ningún documento sin hablar con un abogado"
-          ]
-        },
-        iceStreet: {
-          title: "Qué Hacer Si ICE Se Te Acerca en la Calle",
-          content: [
-            "Qué Hacer:",
-            "• Tienes derecho a guardar silencio y no tienes que discutir tu estatus migratorio",
-            "• Pregunta si eres libre de irte. Si dicen que sí, aléjate tranquilamente",
-            "• Tienes derecho a negarte a mostrar identificación o responder preguntas",
-            "• Recuerda, no tienes que firmar ningún documento sin hablar con un abogado"
-          ]
-        }
-      }
+    registro: {
+      title: "Registrar Encuentro",
+      startRecording: "Iniciar Grabación",
+      stopRecording: "Detener Grabación",
+      recordings: "Grabaciones Guardadas",
+      notifyRecording: "Notificar Grabación",
+      constitutionalRights: "Derechos Constitucionales",
+      badgeNumber: "Solicitar Número de Placa",
+      freeToGo: "Preguntar si Puede Irse",
+      goodbye: "Finalizar Encuentro",
+      location: "Ubicación",
+      date: "Fecha",
+      time: "Hora",
+      play: "Reproducir Grabación",
+      save: "Guardar Grabación",
+      delete: "Eliminar Grabación"
     },
     errors: {
       fetchMarkers: 'No se pudieron cargar los marcadores. Por favor, inténtalo de nuevo más tarde.',
@@ -243,22 +149,6 @@ export const translations = {
         recording: 'Error al acceder al micrófono. Por favor, verifica los permisos.',
         processing: 'Error al procesar el audio. Por favor, inténtalo de nuevo.'
       }
-    },
-    encounter: {
-      title: 'Traducción en Tiempo Real',
-      listening: 'Escuchando...',
-      pressListen: 'Presiona el botón del micrófono para comenzar a escuchar',
-      startListening: 'Comenzar a Escuchar',
-      stopListening: 'Dejar de Escuchar',
-      speak: 'Hablar Traducción',
-      loading: 'Cargando...',
-      playSound: 'Reproducir Sonido',
-      stopSound: 'Detener Sonido',
-      recordMessage: 'Graba tu mensaje',
-      startRecording: 'Comenzar Grabación',
-      stopRecording: 'Detener Grabación',
-      generateSpeech: 'Generar Voz',
-      processing: 'Procesando...'
     }
   }
 };

@@ -1,10 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Languages, Map as MapIcon, Music, Scale } from 'lucide-react';
+import { Languages, Map as MapIcon, Music, Scale, FileText } from 'lucide-react';
 import { translations } from './translations';
 import Map from './components/Map';
 import Encounter from './components/Encounter';
 import Rights from './components/Rights';
+import Registro from './components/Registro';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -49,7 +50,7 @@ function App() {
           </div>
           
           {/* Menu Section */}
-          <div className="grid grid-cols-4 divide-x divide-gray-700 border-t border-gray-700">
+          <div className="grid grid-cols-5 divide-x divide-gray-700 border-t border-gray-700">
             <button
               onClick={toggleLanguage}
               className="flex flex-col items-center justify-center py-2 text-gray-300 hover:bg-gray-800 transition-colors"
@@ -89,6 +90,16 @@ function App() {
                 {language === 'es' ? 'Derechos' : 'Rights'}
               </span>
             </Link>
+
+            <Link 
+              to="/registro" 
+              className="flex flex-col items-center justify-center py-2 text-gray-300 hover:bg-gray-800 transition-colors"
+            >
+              <FileText size={20} className="mb-1" />
+              <span className="text-xs font-medium">
+                {language === 'es' ? 'Registro' : 'Proof'}
+              </span>
+            </Link>
           </div>
         </header>
         
@@ -99,6 +110,7 @@ function App() {
             <Route path="/map" element={<Map session={session} language={language} />} />
             <Route path="/encounter" element={<Encounter language={language} />} />
             <Route path="/rights" element={<Rights language={language} />} />
+            <Route path="/registro" element={<Registro language={language} />} />
           </Routes>
         </main>
       </div>
