@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { translations } from '../translations';
-import EncounterPremadeButtons from './EncounterPremadeButtons';
 import { Mic, Volume2, MicOff } from 'lucide-react';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 
@@ -178,11 +177,9 @@ const Encounter = ({ language = 'en' }: EncounterProps) => {
           </div>
         </div>
 
-        <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
-          OR USE PRESET PHRASES
-        </h2>
-
-        <EncounterPremadeButtons speakerMode={true} />
+        <div className="text-center text-gray-400 text-sm mt-4">
+          {t.encounter?.speakInstructions || 'Speak in English to translate to Spanish'}
+        </div>
       </div>
     </div>
   );
