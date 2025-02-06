@@ -173,9 +173,9 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       const constraints = {
         audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
           sampleRate: 48000,
           channelCount: 2
         }
@@ -188,9 +188,9 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       // Define supported MIME types in order of preference
       const mimeTypes = [
-        'audio/webm',
         'audio/webm;codecs=opus',
         'audio/ogg;codecs=opus',
+        'audio/webm',
         'audio/ogg',
         'audio/mp4',
         'audio/aac',
@@ -211,7 +211,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       mediaRecorderRef.current = new MediaRecorder(stream, {
         ...(selectedMimeType && { mimeType: selectedMimeType }),
-        audioBitsPerSecond: 256000
+        audioBitsPerSecond: 128000
       });
       audioChunksRef.current = [];
 
@@ -554,7 +554,11 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
               {presetMessages.map((message, index) => (
                 <button
                   key={index}
-                  onClick={() => generateAndPlaySpeech(message.text)}
+                  onClick={() => {
+                    if (!isGenerating) {
+                      generateAndPlaySpeech(message.text);
+                    }
+                  }}
                   disabled={isGenerating}
                   className={`flex items-center justify-between p-4 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/40 transition-colors ${
                     isGenerating 
@@ -562,22 +566,28 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                       : 'text-gray-100'
                   }`}
                 >
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-medium text-gray-100">{message.title}</h3>
+                    {isGenerating && currentPlaying === message.text && (
+                      <div className="flex items-center gap-2 mt-1 text-sm text-blue-400">
+                        <div className="flex gap-1">
+                          {[...Array(3)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"
+                              style={{ animationDelay: `${i * 150}ms` }}
+                            />
+                          ))}
+                        </div>
+                        <span>Generating audio...</span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 rounded-full transition-colors bg-gray-700 hover:bg-gray-600 text-gray-100">
                     {currentPlaying === message.text ? <Check size={20} /> : <Play size={20} />}
                   </div>
                 </button>
               ))}
-              <div className="mt-3 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className={`h-full bg-blue-500 rounded-full transition-all duration-200 ${
-                    currentPlaying ? 'animate-progress' : ''
-                  }`}
-                  style={{ width: currentPlaying ? '100%' : '0%' }}
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -605,20 +615,20 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                     </div>
                   </div>
                   {recording.publicUrl && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2">
                       <a
                         download={`recording_${new Date(recording.created_at).toISOString()}.${recording.recording_url.endsWith('m4a') ? 'm4a' : 'webm'}`}
                         href={recording.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full"
                       >
                         <LinkIcon size={16} />
                         <span className="text-xs whitespace-nowrap">Download Recording</span>
                       </a>
                       <button
                         onClick={() => copyToClipboard(recording.publicUrl!)}
-                        className={`p-2 rounded-full transition-colors ${
+                        className={`p-2 rounded-lg transition-colors flex items-center justify-center gap-2 w-full ${
                           copiedUrl === recording.publicUrl
                             ? 'bg-green-600'
                             : 'bg-gray-700 hover:bg-gray-600'
@@ -626,6 +636,9 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                         title={copiedUrl === recording.publicUrl ? 'Copied!' : 'Copy link'}
                       >
                         <Copy size={16} />
+                        <span className="text-xs whitespace-nowrap">
+                          {copiedUrl === recording.publicUrl ? 'Copied!' : 'Copy Link'}
+                        </span>
                       </button>
                     </div>
                   )}
