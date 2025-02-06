@@ -139,7 +139,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       }
 
       audioRef.current.src = url;
-      audioRef.current.volume = 1.0;
+      audioRef.current.volume = 0.5;
       
       audioRef.current.onended = () => {
         URL.revokeObjectURL(url);
@@ -173,11 +173,11 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       const constraints = {
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 44100,
-          channelCount: 1
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 2
         }
       };
 
@@ -188,8 +188,8 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       // Define supported MIME types in order of preference
       const mimeTypes = [
-        'audio/webm;codecs=opus',
         'audio/webm',
+        'audio/webm;codecs=opus',
         'audio/ogg;codecs=opus',
         'audio/ogg',
         'audio/mp4',
@@ -211,7 +211,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       mediaRecorderRef.current = new MediaRecorder(stream, {
         ...(selectedMimeType && { mimeType: selectedMimeType }),
-        audioBitsPerSecond: 128000
+        audioBitsPerSecond: 256000
       });
       audioChunksRef.current = [];
 
