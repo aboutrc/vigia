@@ -166,9 +166,19 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const startRecording = async () => {
     try {
       console.log('Starting recording...');
-      // Simple audio constraints for better compatibility
+      // First check if MediaRecorder is supported
+      if (!window.MediaRecorder) {
+        throw new Error('MediaRecorder is not supported in this browser');
+      }
+
       const constraints = {
-        audio: true
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100,
+          channelCount: 1
+        }
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -176,9 +186,32 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       console.log('Audio stream obtained');
 
-      // Create MediaRecorder with basic options
+      // Define supported MIME types in order of preference
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+        'audio/aac',
+        'audio/wav'
+      ];
+      
+      let selectedMimeType = '';
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          break;
+        }
+      }
+      
+      if (!selectedMimeType) {
+        selectedMimeType = ''; // Let browser choose default
+      }
+
       mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
+        ...(selectedMimeType && { mimeType: selectedMimeType }),
+        audioBitsPerSecond: 128000
       });
       audioChunksRef.current = [];
 
@@ -218,60 +251,92 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const stopRecording = async () => {
     if (!mediaRecorderRef.current) return;
 
-    const recorder = mediaRecorderRef.current;
-    const tracks = recorder.stream.getTracks();
+    return new Promise<void>((resolve, reject) => {
+      const recorder = mediaRecorderRef.current!;
+      const tracks = recorder.stream.getTracks();
 
-    try {
-      console.log('Stopping recording...');
-      setIsRecording(false);
-      stopVisualization();
-
-      const audioBlob = new Blob(audioChunksRef.current, { 
-        type: mediaRecorderRef.current.mimeType 
-      });
-      await previewRecording(audioBlob);
-
-      // Stop the recorder and tracks
-      if (recorder.state === 'recording') {
-        recorder.stop();
-      }
-
-      tracks.forEach(track => track.stop());
-      
-      // Save the recording
       try {
-        await saveRecording(audioBlob, 'Recording');
+        console.log('Stopping recording...');
+        setIsRecording(false);
+        stopVisualization();
+
+        // Handle the stop event
+        recorder.onstop = async () => {
+          try {
+            console.log('Recorder stopped, processing audio...');
+            const audioBlob = new Blob(audioChunksRef.current, { 
+              type: recorder.mimeType || 'audio/webm' 
+            });
+            
+            console.log('Audio blob created:', {
+              size: audioBlob.size,
+              type: audioBlob.type
+            });
+
+            if (audioBlob.size === 0) {
+              throw new Error('No audio data recorded');
+            }
+
+            await previewRecording(audioBlob);
+            await saveRecording(audioBlob, 'Recording');
+            resolve();
+          } catch (err) {
+            console.error('Error processing recording:', err);
+            reject(err);
+          }
+        };
+
+        // Stop the recorder if it's recording
+        if (recorder.state === 'recording') {
+          recorder.stop();
+        }
+
+        // Stop all tracks
+        tracks.forEach(track => track.stop());
       } catch (err) {
-        console.error('Save recording error:', err);
-        setError(t.errors.general);
-        throw err;
+        console.error('Stop recording error:', err);
+        setError('Failed to stop recording. Please try again.');
+        setIsRecording(false);
+        tracks.forEach(track => track.stop());
+        reject(err);
       }
-    } catch (err) {
-      console.error('Stop recording error:', err);
-      setError('Failed to stop recording. Please try again.');
-      setIsRecording(false);
-      tracks.forEach(track => track.stop());
-    }
+    });
   };
 
   const saveRecording = async (audioBlob: Blob, recordingType: string) => {
     try {
       const timestamp = new Date().toISOString();
-      const extension = audioBlob.type.includes('webm') ? 'webm' : 
-                       audioBlob.type.includes('ogg') ? 'ogg' :
-                       audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+      // Ensure we have a valid extension
+      let extension = 'webm'; // Default to webm
+      const mimeType = audioBlob.type.toLowerCase();
+      if (mimeType.includes('mp4') || mimeType.includes('aac')) {
+        extension = 'mp4';
+      } else if (mimeType.includes('ogg')) {
+        extension = 'ogg';
+      } else if (mimeType.includes('wav')) {
+        extension = 'wav';
+      }
+
       const filename = `recording_${timestamp}_${recordingType.toLowerCase().replace(/\s+/g, '_')}.${extension}`;
       
       console.log('Saving recording:', {
         type: audioBlob.type,
         size: audioBlob.size,
-        filename
+        filename,
+        extension
       });
+
+      if (audioBlob.size === 0) {
+        throw new Error('Empty audio blob');
+      }
       
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('recordings')
-        .upload(filename, audioBlob);
+        .upload(filename, audioBlob, {
+          contentType: audioBlob.type,
+          cacheControl: '3600'
+        });
 
       if (uploadError) throw uploadError;
 
