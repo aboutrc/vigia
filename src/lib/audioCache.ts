@@ -4,8 +4,8 @@ class AudioCache {
   private cache: Map<string, string> = new Map();
   private isInitialized: boolean = false;
   private initPromise: Promise<void> | null = null;
-  private retryDelays = [1000, 2000, 4000];
-  private rateLimitDelay = 1000;
+  private retryDelays = [2000, 4000, 8000]; // Shorter retry delays
+  private rateLimitDelay = 2000; // Reduced delay between requests
   private maxRetries = 3;
   private pendingRequests = new Set<string>();
   private lastRequestTime: number = 0;
@@ -28,6 +28,7 @@ class AudioCache {
         } catch (err) {
           console.error('Error processing queued request:', err);
         }
+        // Ensure minimum delay between requests
         await this.delay(this.rateLimitDelay);
       }
     }
@@ -48,14 +49,9 @@ class AudioCache {
   private async makeRequest(text: string, retryCount = 0): Promise<Response> {
     try {
       await this.waitForRateLimit();
-      
-      // Add timeout to fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
         method: 'POST',
-        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
@@ -72,8 +68,6 @@ class AudioCache {
         })
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         const errorBody = await response.text().catch(() => 'Rate limit exceeded');
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
@@ -81,19 +75,13 @@ class AudioCache {
 
       return response;
     } catch (error) {
-      console.error(`Request failed (attempt ${retryCount + 1}/${this.maxRetries}):`, 
-        error instanceof Error ? error.message : error
-      );
+      console.error(`Request failed (attempt ${retryCount + 1}/${this.maxRetries}):`, error);
       
-      if (error instanceof TypeError && error.message.includes('Failed to fetch') ||
-          error.name === 'AbortError') {
+      // Check for specific error types
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         console.error('Network error - check connection');
-        if (retryCount < this.maxRetries) {
-          await this.delay(this.retryDelays[retryCount]);
-          return this.makeRequest(text, retryCount + 1);
-        }
+        throw new Error('Network error - please check your connection');
       }
-      throw new Error('Network error - please check your connection');
 
       if (retryCount < this.maxRetries) {
         console.log(`Waiting ${this.retryDelays[retryCount]}ms before retry...`);
@@ -106,6 +94,7 @@ class AudioCache {
 
   async generateSpeech(text: string): Promise<string> {
     if (this.pendingRequests.has(text)) {
+      // Wait for any existing request to complete
       console.log('Request already pending, waiting...');
       while (this.pendingRequests.has(text)) {
         await this.delay(100);
@@ -140,40 +129,45 @@ class AudioCache {
   async initialize() {
     if (this.isInitialized) return;
     if (this.initPromise) return this.initPromise;
+
+    // Add initial delay before starting initialization
+    await this.delay(5000);
     
     console.log('Initializing audio cache...');
     this.initPromise = (async () => {
       try {
-        await this.delay(2000); // Shorter initial delay
-        
         const failedStatements: typeof audioStatements = [];
 
+        // Process statements one at a time with rate limiting
         for (const statement of audioStatements) {
           if (!this.cache.has(statement.text)) {
             try {
               console.log(`Generating speech for: ${statement.title}`);
-              await this.generateSpeech(statement.text).catch(() => {
-                failedStatements.push(statement);
-              });
-              await this.delay(this.rateLimitDelay);
+              const url = await this.generateSpeech(statement.text);
+              this.cache.set(statement.text, url);
+              // Add longer delay between successful generations
+              await this.delay(this.rateLimitDelay * 2);
             } catch (err) {
               console.warn(`Failed to generate speech for: ${statement.title}`, err);
               failedStatements.push(statement);
-              await this.delay(this.rateLimitDelay * 2);
+              // Add longer delay after failures
+              await this.delay(this.rateLimitDelay * 4);
             }
           }
         }
 
+        // Retry failed statements once
         if (failedStatements.length > 0) {
           console.log(`Retrying ${failedStatements.length} failed statements...`);
-          await this.delay(this.rateLimitDelay * 2);
+          await this.delay(this.rateLimitDelay * 8);
           
           for (const statement of failedStatements) {
             try {
               if (!this.cache.has(statement.text)) {
                 console.log(`Retrying speech generation for: ${statement.title}`);
-                await this.generateSpeech(statement.text);
-                await this.delay(this.rateLimitDelay);
+                const url = await this.generateSpeech(statement.text);
+                this.cache.set(statement.text, url);
+                await this.delay(this.rateLimitDelay * 4);
               }
             } catch (err) {
               console.error(`Final attempt failed for: ${statement.title}`, err);
@@ -197,6 +191,7 @@ class AudioCache {
   async getAudio(text: string): Promise<string> {
     try {
       console.log('Getting audio for text:', text.substring(0, 50) + '...');
+      // If not in cache, generate it
       if (!this.cache.has(text)) {
         console.log('Audio not in cache, generating...');
         const url = await this.generateSpeech(text);
@@ -210,6 +205,7 @@ class AudioCache {
   }
 
   clearCache() {
+    // Revoke all object URLs
     console.log('Clearing audio cache');
     this.cache.forEach((url) => {
       URL.revokeObjectURL(url);
