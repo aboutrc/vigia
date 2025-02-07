@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, AlertTriangle, Link as LinkIcon, Copy, Play, Check } from 'lucide-react';
 import { translations } from '../translations';
-import { supabase } from '../lib/supabase'; 
+import { supabase } from '../lib/supabase';
+import { audioCache } from '../lib/audioCache';
 
 interface RecordingEntry {
   id: string;
@@ -126,48 +127,58 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       stopCurrentAudio();
       setIsGenerating(true);
       setError(null);
-      
-      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_monolingual_v1",
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true
-          }
-        })
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate speech');
+      // Try to get from cache first
+      let url;
+      try {
+        url = await audioCache.getAudio(text);
+      } catch (cacheError) {
+        console.error('Cache error:', cacheError);
+        // If cache fails, try direct API call
+        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_monolingual_v1",
+            voice_settings: {
+              stability: 0.75,
+              similarity_boost: 0.75,
+              style: 0.0,
+              use_speaker_boost: true
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        url = URL.createObjectURL(blob);
       }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
 
       if (!audioRef.current) {
         audioRef.current = new Audio();
       }
 
       audioRef.current.src = url;
-      audioRef.current.volume = 0.5;
+      audioRef.current.volume = 1.0; // Reset to normal volume
       
-      audioRef.current.onended = () => {
-        URL.revokeObjectURL(url);
+      audioRef.current.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        throw new Error('Failed to play audio');
       };
 
       await audioRef.current.play();
       setCurrentPlaying(text);
     } catch (err) {
       console.error('Speech generation error:', err);
-      setError('Failed to generate speech. Please try again.');
+      setError('Speech generation failed. Please try again in a few seconds.');
+      setCurrentPlaying(null);
     } finally {
       setIsGenerating(false);
     }
@@ -442,7 +453,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     },
     {
       title: t.registro.constitutionalRights,
-      text: "Under my rights in the U.S. Constitution- the fourth, fifth, and fourteenth - I do not have to answer any of your questions unless you have a signed warrant from a judge that you can present me. Do you have one - yes or no?"
+      text: "Under my Fourth, Fifth and Fourteenth amendment rights in the U.S. Constitution, I do not have to answer any of your questions unless you have a signed warrant from a judge that you can present me. Do you have one - yes or no?"
     },
     {
       title: t.registro.badgeNumber,

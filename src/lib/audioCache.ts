@@ -4,8 +4,8 @@ class AudioCache {
   private cache: Map<string, string> = new Map();
   private isInitialized: boolean = false;
   private initPromise: Promise<void> | null = null;
-  private retryDelays = [2000, 4000, 8000]; // Shorter retry delays
-  private rateLimitDelay = 2000; // Reduced delay between requests
+  private retryDelays = [2000, 4000, 8000];
+  private rateLimitDelay = 2000;
   private maxRetries = 3;
   private pendingRequests = new Set<string>();
   private lastRequestTime: number = 0;
@@ -28,7 +28,6 @@ class AudioCache {
         } catch (err) {
           console.error('Error processing queued request:', err);
         }
-        // Ensure minimum delay between requests
         await this.delay(this.rateLimitDelay);
       }
     }
@@ -77,7 +76,6 @@ class AudioCache {
     } catch (error) {
       console.error(`Request failed (attempt ${retryCount + 1}/${this.maxRetries}):`, error);
       
-      // Check for specific error types
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         console.error('Network error - check connection');
         throw new Error('Network error - please check your connection');
@@ -94,7 +92,6 @@ class AudioCache {
 
   async generateSpeech(text: string): Promise<string> {
     if (this.pendingRequests.has(text)) {
-      // Wait for any existing request to complete
       console.log('Request already pending, waiting...');
       while (this.pendingRequests.has(text)) {
         await this.delay(100);
@@ -130,7 +127,6 @@ class AudioCache {
     if (this.isInitialized) return;
     if (this.initPromise) return this.initPromise;
 
-    // Add initial delay before starting initialization
     await this.delay(5000);
     
     console.log('Initializing audio cache...');
@@ -138,25 +134,21 @@ class AudioCache {
       try {
         const failedStatements: typeof audioStatements = [];
 
-        // Process statements one at a time with rate limiting
         for (const statement of audioStatements) {
           if (!this.cache.has(statement.text)) {
             try {
               console.log(`Generating speech for: ${statement.title}`);
               const url = await this.generateSpeech(statement.text);
               this.cache.set(statement.text, url);
-              // Add longer delay between successful generations
               await this.delay(this.rateLimitDelay * 2);
             } catch (err) {
               console.warn(`Failed to generate speech for: ${statement.title}`, err);
               failedStatements.push(statement);
-              // Add longer delay after failures
               await this.delay(this.rateLimitDelay * 4);
             }
           }
         }
 
-        // Retry failed statements once
         if (failedStatements.length > 0) {
           console.log(`Retrying ${failedStatements.length} failed statements...`);
           await this.delay(this.rateLimitDelay * 8);
@@ -191,7 +183,6 @@ class AudioCache {
   async getAudio(text: string): Promise<string> {
     try {
       console.log('Getting audio for text:', text.substring(0, 50) + '...');
-      // If not in cache, generate it
       if (!this.cache.has(text)) {
         console.log('Audio not in cache, generating...');
         const url = await this.generateSpeech(text);
@@ -205,7 +196,6 @@ class AudioCache {
   }
 
   clearCache() {
-    // Revoke all object URLs
     console.log('Clearing audio cache');
     this.cache.forEach((url) => {
       URL.revokeObjectURL(url);
