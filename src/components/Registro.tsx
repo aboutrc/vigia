@@ -128,59 +128,74 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       setIsGenerating(true);
       setError(null);
 
-      let url;
-      try {
-        url = await audioCache.getAudio(text);
-      } catch (cacheError) {
-        console.error('Cache error:', cacheError);
-        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_monolingual_v1",
-            voice_settings: {
-              stability: 0.75,
-              similarity_boost: 0.75,
-              style: 0.0,
-              use_speaker_boost: true
+      // Add retry logic for audio generation
+      const maxRetries = 3;
+      let attempt = 0;
+      let lastError;
+
+      while (attempt < maxRetries) {
+        try {
+          let url;
+          try {
+            url = await audioCache.getAudio(text);
+          } catch (cacheError) {
+            console.error('Cache error:', cacheError);
+            
+            // Add timeout to fetch request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+              },
+              body: JSON.stringify({
+                text,
+                model_id: "eleven_monolingual_v1",
+                voice_settings: {
+                  stability: 0.75,
+                  similarity_boost: 0.75,
+                  style: 0.0,
+                  use_speaker_boost: true
+                }
+              })
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error(`API error: ${response.status}`);
             }
-          })
-        });
 
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
+            const blob = await response.blob();
+            url = URL.createObjectURL(blob);
+          }
+          
+          if (!audioRef.current) {
+            audioRef.current = new Audio();
+          }
+
+          audioRef.current.src = url;
+          await audioRef.current.play();
+          setCurrentPlaying(text);
+          break; // Success - exit retry loop
+        } catch (err) {
+          lastError = err;
+          attempt++;
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+          throw lastError;
         }
-
-        const blob = await response.blob();
-        url = URL.createObjectURL(blob);
       }
 
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-
-      audioRef.current.src = url;
-      // Always set volume to 1.0 regardless of recording state
-      if (audioContextRef.current) {
-        const gainNode = audioContextRef.current.createGain();
-        gainNode.gain.value = 1.0;
-      }
-      audioRef.current.volume = 1.0;
-      
-      audioRef.current.onerror = (e) => {
-        console.error('Audio playback error:', e);
-        throw new Error('Failed to play audio');
-      };
-
-      await audioRef.current.play();
-      setCurrentPlaying(text);
     } catch (err) {
       console.error('Speech generation error:', err);
-      setError('Speech generation failed. Please try again in a few seconds.');
+      setError('Speech generation failed. Please check your connection and try again.');
       setCurrentPlaying(null);
     } finally {
       setIsGenerating(false);
@@ -254,7 +269,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       });
       audioChunksRef.current = [];
 
-
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           console.log('Received audio chunk:', {
@@ -299,7 +313,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
         setIsRecording(false);
         stopVisualization();
 
-        // Handle the stop event
         recorder.onstop = async () => {
           try {
             console.log('Recorder stopped, processing audio...');
@@ -325,12 +338,10 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
           }
         };
 
-        // Stop the recorder if it's recording
         if (recorder.state === 'recording') {
           recorder.stop();
         }
 
-        // Stop all tracks
         tracks.forEach(track => track.stop());
       } catch (err) {
         console.error('Stop recording error:', err);
@@ -345,8 +356,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const saveRecording = async (audioBlob: Blob, recordingType: string) => {
     try {
       const timestamp = new Date().toISOString();
-      // Ensure we have a valid extension
-      let extension = 'webm'; // Default to webm
+      let extension = 'webm';
       const mimeType = audioBlob.type.toLowerCase();
       if (mimeType.includes('mp4') || mimeType.includes('aac')) {
         extension = 'mp4';
@@ -369,7 +379,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
         throw new Error('Empty audio blob');
       }
       
-      // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('recordings')
         .upload(filename, audioBlob, {
@@ -379,7 +388,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL immediately after upload
       const { data: urlData } = await supabase.storage
         .from('recordings')
         .getPublicUrl(uploadData.path, {
@@ -393,14 +401,13 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
         throw new Error('Failed to get public URL');
       }
 
-      // Create database entry
       const { error: dbError } = await supabase
         .from('recordings')
         .insert([
           {
             recording_url: uploadData.path,
             public_url: urlData.publicUrl,
-            location: `${recordingType} - ${location || 'Unknown location'}`,
+            location: location || 'Unknown location',
             created_at: timestamp
           }
         ]);
@@ -411,7 +418,30 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     } catch (err) {
       console.error('Save recording error:', err);
       setError(t.errors.general);
-      throw err; // Re-throw to handle in the calling function
+      throw err;
+    }
+  };
+
+  const fetchRecordings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recordings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const recordingsWithUrls = await Promise.all(
+        (data || []).map(async (recording) => ({
+          ...recording,
+          publicUrl: await getRecordingUrl(recording.recording_url)
+        }))
+      );
+
+      setRecordings(recordingsWithUrls);
+    } catch (err) {
+      console.error('Error fetching recordings:', err);
+      setError(t.errors.general);
     }
   };
 
@@ -432,53 +462,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     }
   };
 
-  const fetchRecordings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('recordings')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Get public URLs for all recordings
-      const recordingsWithUrls = await Promise.all(
-        (data || []).map(async (recording) => ({
-          ...recording,
-          publicUrl: await getRecordingUrl(recording.recording_url)
-        }))
-      );
-
-      setRecordings(recordingsWithUrls);
-    } catch (err) {
-      console.error('Error fetching recordings:', err);
-      setError(t.errors.general);
-    }
-  };
-
-  const presetMessages = [
-    {
-      title: t.registro.notifyRecording,
-      text: "This conversation is being recorded for documentary evidence should I need it."
-    },
-    {
-      title: t.registro.constitutionalRights,
-      text: "Under my Fourth, Fifth and Fourteenth amendment rights in the U.S. Constitution, I do not have to answer any of your questions unless you have a signed warrant from a judge that you can present me. Do you have one - yes or no?"
-    },
-    {
-      title: t.registro.badgeNumber,
-      text: "What is your Badge number?"
-    },
-    {
-      title: t.registro.freeToGo,
-      text: "Am I free to go? Yes or no."
-    },
-    {
-      title: t.registro.goodbye,
-      text: "Thank you. I have documented this for my records. Have a good day officer."
-    }
-  ];
-
   const copyToClipboard = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -488,12 +471,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       console.error('Failed to copy URL:', err);
       setError('Failed to copy URL to clipboard');
     }
-  };
-
-  const presetAudioFiles = {
-    notifyRecording: '/audio/checkpoint.mp3',
-    constitutionalRights: '/audio/rights.mp3',
-    emergency: '/audio/emergency.mp3'
   };
 
   useEffect(() => {
@@ -514,12 +491,8 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-100 mb-6">
-            {language === 'en' ? 'Officer Encounter' : 'Encuentro con Oficial'}
+            {language === 'en' ? 'Proof' : 'Registro'}
           </h1>
-
-          <p className="text-gray-300 mb-8">
-            Press the record button to start the documentation. Then start pressing each of the buttons and wait for the officer to respond before pressing the next one. After pressing the goodbye button you will have a copy of your interaction stored for you to hear or send to someone.
-          </p>
 
           {error && (
             <div className="mb-4 p-4 bg-red-900/50 text-red-100 rounded-lg flex items-center">
@@ -541,16 +514,16 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                     </div>
                   </div>
                 )}
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`p-4 rounded-full ${
-                  isRecording 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white transition-colors`}
-              >
-                {isRecording ? <Square size={24} /> : <Mic size={24} />}
-              </button>
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`p-4 rounded-full ${
+                    isRecording 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  } text-white transition-colors`}
+                >
+                  {isRecording ? <Square size={24} /> : <Mic size={24} />}
+                </button>
               </div>
             </div>
             
@@ -574,46 +547,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                 </button>
               </div>
             )}
-
-            <div className="grid gap-4">
-              {presetMessages.map((message, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    if (!isGenerating) {
-                      generateAndPlaySpeech(message.text);
-                    }
-                  }}
-                  disabled={isGenerating}
-                  className={`flex items-center justify-between p-4 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/40 transition-colors ${
-                    isGenerating 
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'text-gray-100'
-                  }`}
-                >
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-100">{message.title}</h3>
-                    {isGenerating && currentPlaying === message.text && (
-                      <div className="flex items-center gap-2 mt-1 text-sm text-blue-400">
-                        <div className="flex gap-1">
-                          {[...Array(3)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"
-                              style={{ animationDelay: `${i * 150}ms` }}
-                            />
-                          ))}
-                        </div>
-                        <span>Generating audio...</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-full transition-colors bg-gray-700 hover:bg-gray-600 text-gray-100">
-                    {currentPlaying === message.text ? <Check size={20} /> : <Play size={20} />}
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -627,26 +560,24 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
               <div 
                 key={recording.id}
                 className="p-4 bg-gray-800 rounded-lg text-gray-100"
-              >
-                <div className="flex flex-col">
-                  <div>
-                    <div className="text-sm text-gray-400">
-                      {new Date(recording.created_at).toLocaleString(
-                        language === 'es' ? 'es-ES' : 'en-US'
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-400 mt-1">
-                      Location: {recording.location}
-                    </div>
-                  </div>
+              > 
+                <div className="flex flex-col space-y-3">
+                  <div className="text-sm text-gray-400 space-y-1">
+                    <div>Record Date & Time:</div>
+                    <div>{new Date(recording.created_at).toLocaleString(
+                      language === 'es' ? 'es-ES' : 'en-US'
+                    )}</div>
+                    <div>Recording Location:</div>
+                    <div>{recording.location}</div>
+                  
                   {recording.publicUrl && (
-                    <div className="mt-3 flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 mt-2">
                       <a
                         download={`recording_${new Date(recording.created_at).toISOString()}.${recording.recording_url.endsWith('m4a') ? 'm4a' : 'webm'}`}
                         href={recording.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full"
+                        className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <LinkIcon size={16} />
                         <span className="text-xs whitespace-nowrap">Download Recording</span>
@@ -667,6 +598,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             ))}

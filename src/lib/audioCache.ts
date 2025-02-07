@@ -4,8 +4,8 @@ class AudioCache {
   private cache: Map<string, string> = new Map();
   private isInitialized: boolean = false;
   private initPromise: Promise<void> | null = null;
-  private retryDelays = [2000, 4000, 8000];
-  private rateLimitDelay = 2000;
+  private retryDelays = [1000, 2000, 4000];
+  private rateLimitDelay = 1000;
   private maxRetries = 3;
   private pendingRequests = new Set<string>();
   private lastRequestTime: number = 0;
@@ -48,9 +48,14 @@ class AudioCache {
   private async makeRequest(text: string, retryCount = 0): Promise<Response> {
     try {
       await this.waitForRateLimit();
+      
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
@@ -67,6 +72,8 @@ class AudioCache {
         })
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         const errorBody = await response.text().catch(() => 'Rate limit exceeded');
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
@@ -74,12 +81,19 @@ class AudioCache {
 
       return response;
     } catch (error) {
-      console.error(`Request failed (attempt ${retryCount + 1}/${this.maxRetries}):`, error);
+      console.error(`Request failed (attempt ${retryCount + 1}/${this.maxRetries}):`, 
+        error instanceof Error ? error.message : error
+      );
       
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      if (error instanceof TypeError && error.message.includes('Failed to fetch') ||
+          error.name === 'AbortError') {
         console.error('Network error - check connection');
-        throw new Error('Network error - please check your connection');
+        if (retryCount < this.maxRetries) {
+          await this.delay(this.retryDelays[retryCount]);
+          return this.makeRequest(text, retryCount + 1);
+        }
       }
+      throw new Error('Network error - please check your connection');
 
       if (retryCount < this.maxRetries) {
         console.log(`Waiting ${this.retryDelays[retryCount]}ms before retry...`);
@@ -126,40 +140,40 @@ class AudioCache {
   async initialize() {
     if (this.isInitialized) return;
     if (this.initPromise) return this.initPromise;
-
-    await this.delay(5000);
     
     console.log('Initializing audio cache...');
     this.initPromise = (async () => {
       try {
+        await this.delay(2000); // Shorter initial delay
+        
         const failedStatements: typeof audioStatements = [];
 
         for (const statement of audioStatements) {
           if (!this.cache.has(statement.text)) {
             try {
               console.log(`Generating speech for: ${statement.title}`);
-              const url = await this.generateSpeech(statement.text);
-              this.cache.set(statement.text, url);
-              await this.delay(this.rateLimitDelay * 2);
+              await this.generateSpeech(statement.text).catch(() => {
+                failedStatements.push(statement);
+              });
+              await this.delay(this.rateLimitDelay);
             } catch (err) {
               console.warn(`Failed to generate speech for: ${statement.title}`, err);
               failedStatements.push(statement);
-              await this.delay(this.rateLimitDelay * 4);
+              await this.delay(this.rateLimitDelay * 2);
             }
           }
         }
 
         if (failedStatements.length > 0) {
           console.log(`Retrying ${failedStatements.length} failed statements...`);
-          await this.delay(this.rateLimitDelay * 8);
+          await this.delay(this.rateLimitDelay * 2);
           
           for (const statement of failedStatements) {
             try {
               if (!this.cache.has(statement.text)) {
                 console.log(`Retrying speech generation for: ${statement.title}`);
-                const url = await this.generateSpeech(statement.text);
-                this.cache.set(statement.text, url);
-                await this.delay(this.rateLimitDelay * 4);
+                await this.generateSpeech(statement.text);
+                await this.delay(this.rateLimitDelay);
               }
             } catch (err) {
               console.error(`Final attempt failed for: ${statement.title}`, err);
