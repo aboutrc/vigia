@@ -128,13 +128,11 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       setIsGenerating(true);
       setError(null);
 
-      // Try to get from cache first
       let url;
       try {
         url = await audioCache.getAudio(text);
       } catch (cacheError) {
         console.error('Cache error:', cacheError);
-        // If cache fails, try direct API call
         const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
           method: 'POST',
           headers: {
@@ -166,7 +164,12 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       }
 
       audioRef.current.src = url;
-      audioRef.current.volume = 1.0; // Reset to normal volume
+      // Always set volume to 1.0 regardless of recording state
+      if (audioContextRef.current) {
+        const gainNode = audioContextRef.current.createGain();
+        gainNode.gain.value = 1.0;
+      }
+      audioRef.current.volume = 1.0;
       
       audioRef.current.onerror = (e) => {
         console.error('Audio playback error:', e);
@@ -195,7 +198,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const startRecording = async () => {
     try {
       console.log('Starting recording...');
-      // First check if MediaRecorder is supported
       if (!window.MediaRecorder) {
         throw new Error('MediaRecorder is not supported in this browser');
       }
@@ -211,6 +213,14 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Create a gain node to ensure consistent volume
+      if (audioContextRef.current) {
+        const gainNode = audioContextRef.current.createGain();
+        gainNode.gain.value = 1.0; // Keep gain at 1.0 for consistent volume
+        gainNode.connect(audioContextRef.current.destination);
+      }
+      
       visualizeAudio(stream);
 
       console.log('Audio stream obtained');
