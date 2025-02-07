@@ -191,11 +191,16 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       const constraints = {
         audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 48000,
-          channelCount: 2
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100, // CD quality
+          channelCount: 2, // Stereo for better quality recordings
+          latency: 0, // Minimize delay
+          googEchoCancellation: true, // Chrome-specific
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true
         }
       };
 

@@ -52,6 +52,16 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
 
   const startRecording = async () => {
     try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 2
+        }
+      });
+
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         throw new Error('Speech recognition is not supported in your browser');
       }
@@ -62,6 +72,11 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
+      
+      // Clean up the stream when stopping
+      recognitionRef.current.onaudioend = () => {
+        stream.getTracks().forEach(track => track.stop());
+      };
 
       recognitionRef.current.onresult = async (event: any) => {
         let interimTranscript = '';
