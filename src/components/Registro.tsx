@@ -30,6 +30,24 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const animationFrameRef = useRef<number | null>(null);
   const t = translations[language];
 
+  useEffect(() => {
+    // Get user's location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation(`${position.coords.latitude},${position.coords.longitude}`);
+        },
+        (err) => {
+          console.error('Location error:', err);
+          setLocation('Location unavailable');
+        }
+      );
+    }
+
+    // Fetch existing recordings
+    fetchRecordings();
+  }, []);
+
   const visualizeAudio = (stream: MediaStream) => {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
@@ -458,24 +476,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   };
 
   useEffect(() => {
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation(`${position.coords.latitude},${position.coords.longitude}`);
-        },
-        (err) => {
-          console.error('Location error:', err);
-          setLocation('Location unavailable');
-        }
-      );
-    }
-
-    // Fetch existing recordings
-    fetchRecordings();
-  }, []);
-
-  useEffect(() => {
     return () => {
       stopVisualization();
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -493,8 +493,12 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-100 mb-6">
-            {language === 'en' ? 'Proof' : 'Registro'}
+            {language === 'en' ? 'Officer Encounter' : 'Encuentro con Oficial'}
           </h1>
+
+          <p className="text-gray-300 mb-8">
+            Press the record button to start the documentation. Then start pressing each of the buttons and wait for the officer to respond before pressing the next one. After pressing the goodbye button you will have a copy of your interaction stored for you to hear or send to someone.
+          </p>
 
           {error && (
             <div className="mb-4 p-4 bg-red-900/50 text-red-100 rounded-lg flex items-center">
