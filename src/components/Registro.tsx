@@ -1,37 +1,72 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, AlertTriangle, Link as LinkIcon, Copy, Play, Check } from 'lucide-react';
+import { Mic, Square, AlertTriangle, Link as LinkIcon, Copy, Volume2 } from 'lucide-react';
 import { translations } from '../translations';
-import { supabase } from '../lib/supabase'; 
+import { supabase } from '../lib/supabase';
+import { audioStatements } from '../lib/audioStatements';
 
 interface RecordingEntry {
   id: string;
   recording_url: string;
   created_at: string;
   location: string;
-  publicUrl?: string;
+  public_url: string;
 }
 
 const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [recordings, setRecordings] = useState<RecordingEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
-  const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  
+  // Audio Context refs
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const audioChunksRef = useRef<Float32Array[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
+  
   const t = translations[language];
 
+  const checkMicrophonePermission = async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,  // Disable echo cancellation
+          noiseSuppression: false,  // Disable noise suppression
+          autoGainControl: false,   // Disable automatic gain control
+          channelCount: 1,          // Mono recording
+          sampleRate: 44100         // Standard sample rate
+        }
+      });
+      
+      stream.getTracks().forEach(track => track.stop());
+      setHasPermission(true);
+      setError(null);
+      return true;
+    } catch (err: any) {
+      console.error('Microphone permission error:', err);
+      setHasPermission(false);
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError('Microphone access was denied. Please allow microphone access in your browser settings.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else {
+        setError('Unable to access microphone. Please check your device settings.');
+      }
+      
+      return false;
+    }
+  };
+
   useEffect(() => {
-    // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -44,347 +79,203 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       );
     }
 
-    // Fetch existing recordings
     fetchRecordings();
-  }, []);
+    checkMicrophonePermission();
 
-  const visualizeAudio = (stream: MediaStream) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-
-    const audioContext = audioContextRef.current;
-    const analyser = audioContext.createAnalyser();
-    analyserRef.current = analyser;
-    
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
-    analyser.fftSize = 256;
-
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const updateAudioLevel = () => {
-      if (!analyserRef.current) return;
-      
-      analyserRef.current.getByteFrequencyData(dataArray);
-      const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-      setAudioLevel(average);
-
-      animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+    return () => {
+      stopRecording();
     };
-
-    updateAudioLevel();
-  };
-
-  const stopVisualization = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    setAudioLevel(0);
-  };
-
-  const previewRecording = async (audioBlob: Blob) => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    const url = URL.createObjectURL(audioBlob);
-    setPreviewUrl(url);
-
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
-    audioRef.current.src = url;
-    audioRef.current.onended = () => setIsPlaying(false);
-  };
-
-  const playPreview = () => {
-    if (!audioRef.current || !previewUrl) return;
-    
-    if (isPlaying) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
-  };
-
-  const generateAndPlaySpeech = async (text: string) => {
-    try {
-      if (currentPlaying === text) {
-        stopCurrentAudio();
-        return;
-      }
-
-      stopCurrentAudio();
-      setIsGenerating(true);
-      setError(null);
-      
-      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_monolingual_v1",
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate speech');
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-
-      audioRef.current.src = url;
-      audioRef.current.volume = 1.0; // Set to maximum allowed volume
-      
-      audioRef.current.onended = () => {
-        URL.revokeObjectURL(url);
-      };
-
-      await audioRef.current.play();
-      setCurrentPlaying(text);
-    } catch (err) {
-      console.error('Speech generation error:', err);
-      setError('Failed to generate speech. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const stopCurrentAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setCurrentPlaying(null);
-    }
-  };
+  }, []);
 
   const startRecording = async () => {
     try {
-      console.log('Starting recording...');
-      // First check if MediaRecorder is supported
-      if (!window.MediaRecorder) {
-        throw new Error('MediaRecorder is not supported in this browser');
-      }
+      const hasAccess = await checkMicrophonePermission();
+      if (!hasAccess) return;
 
-      const constraints = {
+      // Request microphone access with specific high-quality settings
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 44100, // CD quality
-          channelCount: 2, // Stereo for better quality recordings
-          latency: 0, // Minimize delay
-          googEchoCancellation: true, // Chrome-specific
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true
+          echoCancellation: false,      // Disable echo cancellation
+          noiseSuppression: false,      // Disable noise suppression
+          autoGainControl: false,       // Disable automatic gain control
+          channelCount: 1,              // Mono recording
+          sampleRate: 48000,            // Higher sample rate
+          latency: 0,                   // Minimize latency
+          sampleSize: 24                // Higher bit depth
         }
+      });
+
+      // Create Audio Context with higher sample rate
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 48000,              // Match input sample rate
+        latencyHint: 'interactive'
+      });
+
+      // Create source node
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      
+      // Create processor node with larger buffer for better quality
+      const processorNode = audioContext.createScriptProcessor(8192, 1, 1);
+      
+      // Connect nodes
+      sourceNode.connect(processorNode);
+      processorNode.connect(audioContext.destination);
+
+      // Handle audio processing with gain boost
+      processorNode.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Apply gain boost to capture quieter sounds
+        const boostedData = new Float32Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          // Boost the signal (1.5x gain) while preventing clipping
+          boostedData[i] = Math.max(-1, Math.min(1, inputData[i] * 1.5));
+        }
+        audioChunksRef.current.push(boostedData);
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      visualizeAudio(stream);
-
-      console.log('Audio stream obtained');
-
-      // Define supported MIME types in order of preference
-      const mimeTypes = [
-        'audio/webm;codecs=opus',
-        'audio/ogg;codecs=opus',
-        'audio/webm',
-        'audio/ogg',
-        'audio/mp4',
-        'audio/aac',
-        'audio/wav'
-      ];
-      
-      let selectedMimeType = '';
-      for (const type of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          selectedMimeType = type;
-          break;
-        }
-      }
-      
-      if (!selectedMimeType) {
-        selectedMimeType = ''; // Let browser choose default
-      }
-
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        ...(selectedMimeType && { mimeType: selectedMimeType }),
-        audioBitsPerSecond: 128000
-      });
+      // Store refs
+      audioContextRef.current = audioContext;
+      streamRef.current = stream;
+      sourceNodeRef.current = sourceNode;
+      processorRef.current = processorNode;
       audioChunksRef.current = [];
 
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          console.log('Received audio chunk:', {
-            size: event.data.size,
-            type: event.data.type,
-            time: new Date().toISOString()
-          });
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorderRef.current.onerror = (event: any) => {
-        console.error('MediaRecorder error:', event.error);
-        setError('Recording error occurred. Please try again.');
-        stopRecording();
-      };
-
-      mediaRecorderRef.current.start();
-      console.log('Recording started');
-      
       setIsRecording(true);
       setError(null);
     } catch (err) {
-      console.error('Recording setup error:', err instanceof Error ? {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      } : err);
-      setError(t.errors.audio.recording);
+      console.error('Recording setup error:', err);
+      setError('Failed to start recording. Please check microphone permissions.');
     }
   };
 
   const stopRecording = async () => {
-    if (!mediaRecorderRef.current) return;
+    if (!isRecording) return;
 
-    return new Promise<void>((resolve, reject) => {
-      const recorder = mediaRecorderRef.current!;
-      const tracks = recorder.stream.getTracks();
-
-      try {
-        console.log('Stopping recording...');
-        setIsRecording(false);
-        stopVisualization();
-
-        // Handle the stop event
-        recorder.onstop = async () => {
-          try {
-            console.log('Recorder stopped, processing audio...');
-            const audioBlob = new Blob(audioChunksRef.current, { 
-              type: recorder.mimeType || 'audio/webm' 
-            });
-            
-            console.log('Audio blob created:', {
-              size: audioBlob.size,
-              type: audioBlob.type
-            });
-
-            if (audioBlob.size === 0) {
-              throw new Error('No audio data recorded');
-            }
-
-            await previewRecording(audioBlob);
-            await saveRecording(audioBlob, 'Recording');
-            resolve();
-          } catch (err) {
-            console.error('Error processing recording:', err);
-            reject(err);
-          }
-        };
-
-        // Stop the recorder if it's recording
-        if (recorder.state === 'recording') {
-          recorder.stop();
-        }
-
-        // Stop all tracks
-        tracks.forEach(track => track.stop());
-      } catch (err) {
-        console.error('Stop recording error:', err);
-        setError('Failed to stop recording. Please try again.');
-        setIsRecording(false);
-        tracks.forEach(track => track.stop());
-        reject(err);
+    try {
+      // Stop recording
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        sourceNodeRef.current?.disconnect();
       }
-    });
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+      }
+
+      // Convert audio data to WAV
+      if (audioChunksRef.current.length > 0) {
+        const audioData = concatenateAudioBuffers(audioChunksRef.current);
+        const wavBlob = createWavBlob(audioData);
+        await saveRecording(wavBlob);
+      }
+
+      // Clear refs
+      audioContextRef.current = null;
+      streamRef.current = null;
+      sourceNodeRef.current = null;
+      processorRef.current = null;
+      audioChunksRef.current = [];
+
+      setIsRecording(false);
+    } catch (err) {
+      console.error('Stop recording error:', err);
+      setError('Failed to stop recording. Please try again.');
+    }
   };
 
-  const saveRecording = async (audioBlob: Blob, recordingType: string) => {
+  const concatenateAudioBuffers = (buffers: Float32Array[]): Float32Array => {
+    const totalLength = buffers.reduce((acc, buf) => acc + buf.length, 0);
+    const result = new Float32Array(totalLength);
+    let offset = 0;
+    
+    for (const buffer of buffers) {
+      result.set(buffer, offset);
+      offset += buffer.length;
+    }
+    
+    return result;
+  };
+
+  const createWavBlob = (audioData: Float32Array): Blob => {
+    const numChannels = 1;
+    const sampleRate = 44100;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = audioData.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    // Write WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');                     // ChunkID
+    view.setUint32(4, 36 + dataSize, true);     // ChunkSize
+    writeString(8, 'WAVE');                     // Format
+    writeString(12, 'fmt ');                    // Subchunk1ID
+    view.setUint32(16, 16, true);               // Subchunk1Size
+    view.setUint16(20, 1, true);                // AudioFormat (PCM)
+    view.setUint16(22, numChannels, true);      // NumChannels
+    view.setUint32(24, sampleRate, true);       // SampleRate
+    view.setUint32(28, byteRate, true);         // ByteRate
+    view.setUint16(32, blockAlign, true);       // BlockAlign
+    view.setUint16(34, bitsPerSample, true);    // BitsPerSample
+    writeString(36, 'data');                    // Subchunk2ID
+    view.setUint32(40, dataSize, true);         // Subchunk2Size
+
+    // Write audio data
+    const offset = 44;
+    for (let i = 0; i < audioData.length; i++) {
+      const sample = Math.max(-1, Math.min(1, audioData[i]));
+      const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      view.setInt16(offset + i * 2, value, true);
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
+  const saveRecording = async (audioBlob: Blob) => {
     try {
-      const timestamp = new Date().toISOString();
-      // Ensure we have a valid extension
-      let extension = 'webm'; // Default to webm
-      const mimeType = audioBlob.type.toLowerCase();
-      if (mimeType.includes('mp4') || mimeType.includes('aac')) {
-        extension = 'mp4';
-      } else if (mimeType.includes('ogg')) {
-        extension = 'ogg';
-      } else if (mimeType.includes('wav')) {
-        extension = 'wav';
-      }
-
-      const filename = `recording_${timestamp}_${recordingType.toLowerCase().replace(/\s+/g, '_')}.${extension}`;
-      
-      console.log('Saving recording:', {
-        type: audioBlob.type,
-        size: audioBlob.size,
-        filename,
-        extension
-      });
-
       if (audioBlob.size === 0) {
-        throw new Error('Empty audio blob');
+        throw new Error('Audio recording is empty');
       }
+
+      const timestamp = new Date().toISOString();
+      const filename = `recording_${timestamp}.wav`;
       
-      // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('recordings')
         .upload(filename, audioBlob, {
-          contentType: audioBlob.type,
+          contentType: 'audio/wav',
           cacheControl: '3600'
         });
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL immediately after upload
       const { data: urlData } = await supabase.storage
         .from('recordings')
-        .getPublicUrl(uploadData.path, {
-          download: true,
-          transform: {
-            quality: 75
-          }
-        });
+        .getPublicUrl(uploadData.path);
 
       if (!urlData?.publicUrl) {
         throw new Error('Failed to get public URL');
       }
 
-      // Create database entry
       const { error: dbError } = await supabase
         .from('recordings')
         .insert([
           {
             recording_url: uploadData.path,
             public_url: urlData.publicUrl,
-            location: `${recordingType} - ${location || 'Unknown location'}`,
+            location: location || 'Unknown location',
             created_at: timestamp
           }
         ]);
@@ -394,25 +285,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       await fetchRecordings();
     } catch (err) {
       console.error('Save recording error:', err);
-      setError(t.errors.general);
-      throw err; // Re-throw to handle in the calling function
-    }
-  };
-
-  const getRecordingUrl = async (path: string) => {
-    try {
-      const { data } = await supabase.storage
-        .from('recordings')
-        .getPublicUrl(path);
-      
-      if (!data?.publicUrl) {
-        throw new Error('Failed to get signed URL');
-      }
-
-      return data.publicUrl;
-    } catch (err) {
-      console.error('Error getting public URL:', err);
-      return null;
+      setError('Failed to save recording. Please try again.');
     }
   };
 
@@ -425,43 +298,12 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       if (error) throw error;
 
-      // Get public URLs for all recordings
-      const recordingsWithUrls = await Promise.all(
-        (data || []).map(async (recording) => ({
-          ...recording,
-          publicUrl: await getRecordingUrl(recording.recording_url)
-        }))
-      );
-
-      setRecordings(recordingsWithUrls);
+      setRecordings(data || []);
     } catch (err) {
       console.error('Error fetching recordings:', err);
-      setError(t.errors.general);
+      setError('Failed to load recordings');
     }
   };
-
-  const presetMessages = [
-    {
-      title: t.registro.notifyRecording,
-      text: "This conversation is being recorded for documentary evidence should I need it."
-    },
-    {
-      title: t.registro.constitutionalRights,
-      text: "Under my Fourth, Fifth and Fourteenth amendment rights in the U.S. Constitution, I do not have to answer any of your questions unless you have a signed warrant from a judge that you can present me. Do you have one - yes or no?"
-    },
-    {
-      title: t.registro.badgeNumber,
-      text: "What is your Badge number?"
-    },
-    {
-      title: t.registro.freeToGo,
-      text: "Am I free to go? Yes or no."
-    },
-    {
-      title: t.registro.goodbye,
-      text: "Thank you. I have documented this for my records. Have a good day officer."
-    }
-  ];
 
   const copyToClipboard = async (url: string) => {
     try {
@@ -474,35 +316,93 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     }
   };
 
-  const presetAudioFiles = {
-    notifyRecording: '/audio/checkpoint.mp3',
-    constitutionalRights: '/audio/rights.mp3',
-    emergency: '/audio/emergency.mp3'
-  };
+  const generateAndPlaySpeech = async (text: string) => {
+    try {
+      if (currentPlaying === text) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+        setCurrentPlaying(null);
+        return;
+      }
 
-  useEffect(() => {
-    return () => {
-      stopVisualization();
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsGenerating(true);
+      setError(null);
+      
+      const makeRequest = async (retryCount: number): Promise<Response> => {
+        try {
+          const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+            },
+            body: JSON.stringify({
+              text,
+              model_id: "eleven_monolingual_v1",
+              voice_settings: {
+                stability: 0.75,
+                similarity_boost: 0.75,
+                style: 0.0,
+                use_speaker_boost: true
+              }
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          return response;
+        } catch (err) {
+          if (retryCount < maxRetries) {
+            console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return makeRequest(retryCount + 1);
+          }
+          throw err;
+        }
+      };
+
+      const response = await makeRequest(0);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
       }
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, []);
+
+      audioRef.current.src = url;
+      audioRef.current.volume = 1.0; // Set to full volume for better recording
+      
+      audioRef.current.onended = () => {
+        setCurrentPlaying(null);
+        URL.revokeObjectURL(url);
+      };
+
+      await audioRef.current.play();
+      setCurrentPlaying(text);
+    } catch (err) {
+      console.error('Speech generation error:', err);
+      setError('Failed to generate speech. Please try again.');
+      setCurrentPlaying(null);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-2xl mx-auto space-y-8">
+        {/* Recording Section */}
         <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-100 mb-6">
             {language === 'en' ? 'Officer Encounter' : 'Encuentro con Oficial'}
           </h1>
 
           <p className="text-gray-300 mb-8">
-            Press the record button to start the documentation. Then start pressing each of the buttons and wait for the officer to respond before pressing the next one. After pressing the goodbye button you will have a copy of your interaction stored for you to hear or send to someone.
+            Press the record button to start documenting your interaction. The recording will be saved automatically when you stop.
           </p>
 
           {error && (
@@ -512,95 +412,74 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              <div className="relative">
-                {isRecording && (
-                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 w-32">
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 transition-all duration-100"
-                        style={{ width: `${(audioLevel / 255) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`p-4 rounded-full ${
-                  isRecording 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white transition-colors`}
-              >
-                {isRecording ? <Square size={24} /> : <Mic size={24} />}
-              </button>
-              </div>
-            </div>
-            
-            {previewUrl && !isRecording && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  onClick={playPreview}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                  {isPlaying ? (
-                    <>
-                      <Square size={16} />
-                      Stop Preview
-                    </>
-                  ) : (
-                    <>
-                      <Play size={16} />
-                      Preview Recording
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            <div className="grid gap-4">
-              {presetMessages.map((message, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    if (!isGenerating) {
-                      generateAndPlaySpeech(message.text);
-                    }
-                  }}
-                  disabled={isGenerating}
-                  className={`flex items-center justify-between p-4 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/40 transition-colors ${
-                    isGenerating 
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'text-gray-100'
-                  }`}
-                >
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-100">{message.title}</h3>
-                    {isGenerating && currentPlaying === message.text && (
-                      <div className="flex items-center gap-2 mt-1 text-sm text-blue-400">
-                        <div className="flex gap-1">
-                          {[...Array(3)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"
-                              style={{ animationDelay: `${i * 150}ms` }}
-                            />
-                          ))}
-                        </div>
-                        <span>Generating audio...</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-full transition-colors bg-gray-700 hover:bg-gray-600 text-gray-100">
-                    {currentPlaying === message.text ? <Check size={20} /> : <Play size={20} />}
-                  </div>
-                </button>
-              ))}
-            </div>
+          <div className="flex justify-center">
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`p-4 rounded-full ${
+                isRecording 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } text-white transition-colors`}
+              disabled={hasPermission === false}
+            >
+              {isRecording ? <Square size={24} /> : <Mic size={24} />}
+            </button>
           </div>
         </div>
 
+        {/* Quick Response Buttons */}
+        <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-gray-100 mb-4 flex items-center">
+            <Volume2 className="mr-2" />
+            Quick Responses
+          </h2>
+          
+          <div className="grid gap-4">
+            {audioStatements.map((audio) => {
+              const isPlaying = currentPlaying === audio.text;
+              const isDisabled = isGenerating && currentPlaying !== audio.text;
+
+              return (
+                <div
+                  key={audio.title}
+                  className="bg-black/30 backdrop-blur-sm rounded-lg p-4 hover:bg-black/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-100">{audio.title}</h3>
+                      <p className="text-sm text-gray-400">
+                        Click to play
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => generateAndPlaySpeech(audio.text)}
+                      disabled={isDisabled}
+                      className={`p-3 rounded-full transition-colors ${
+                        isPlaying 
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                          : isDisabled
+                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-100'
+                      }`}
+                    >
+                      {isPlaying ? <Square size={20} /> : <Volume2 size={20} />}
+                    </button>
+                  </div>
+                  <div className="mt-3 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-blue-500 rounded-full transition-all duration-200 ${
+                        isPlaying ? 'animate-progress' : ''
+                      }`}
+                      style={{ width: isPlaying ? '100%' : '0%' }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Saved Recordings Section */}
         <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
           <h2 className="text-xl font-semibold text-gray-100 mb-4">
             Saved Recordings
@@ -615,46 +494,46 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                 <div className="flex flex-col">
                   <div>
                     <div className="text-sm text-gray-400">
-                      Date & Time of Recording: {new Date(recording.created_at).toLocaleString(
+                      Date & Time: {new Date(recording.created_at).toLocaleString(
                         language === 'es' ? 'es-ES' : 'en-US'
                       )}
                     </div>
-                    <div className="text-sm text-gray-400 mt-1 space-y-1">
-                      <div>Recording Location:</div>
-                      <div className="ml-2">{recording.location.replace('Recording - ', '').trim()}</div>
+                    <div className="text-sm text-gray-400 mt-1">
+                      Location: {recording.location}
                     </div>
                   </div>
-                  {recording.publicUrl && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <a
-                        download={`recording_${new Date(recording.created_at).toISOString()}.${recording.recording_url.endsWith('m4a') ? 'm4a' : 'webm'}`}
-                        href={recording.publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full"
-                      >
-                        <LinkIcon size={16} />
-                        <span className="text-xs whitespace-nowrap">Download Recording</span>
-                      </a>
-                      <button
-                        onClick={() => copyToClipboard(recording.publicUrl!)}
-                        className={`p-2 rounded-lg transition-colors flex items-center justify-center gap-2 w-full ${
-                          copiedUrl === recording.publicUrl
-                            ? 'bg-green-600'
-                            : 'bg-gray-700 hover:bg-gray-600'
-                        }`}
-                        title={copiedUrl === recording.publicUrl ? 'Copied!' : 'Copy link'}
-                      >
-                        <Copy size={16} />
-                        <span className="text-xs whitespace-nowrap">
-                          {copiedUrl === recording.publicUrl ? 'Copied!' : 'Copy Link'}
-                        </span>
-                      </button>
-                    </div>
-                  )}
+                  <div className="mt-3 flex flex-col gap-2">
+                    <a
+                      href={recording.public_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full"
+                    >
+                      <LinkIcon size={16} />
+                      <span className="text-xs whitespace-nowrap">Download Recording</span>
+                    </a>
+                    <button
+                      onClick={() => copyToClipboard(recording.public_url)}
+                      className={`p-2 rounded-lg transition-colors flex items-center justify-center gap-2 w-full ${
+                        copiedUrl === recording.public_url
+                          ? 'bg-green-600'
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                    >
+                      <Copy size={16} />
+                      <span className="text-xs whitespace-nowrap">
+                        {copiedUrl === recording.public_url ? 'Copied!' : 'Copy Link'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+            {recordings.length === 0 && (
+              <div className="text-center text-gray-400">
+                No recordings yet
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -54,11 +54,12 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false,
+          echoCancellation: true,
           noiseSuppression: false,
           autoGainControl: false,
-          sampleRate: 48000,
-          channelCount: 2
+          sampleRate: 44100,
+          channelCount: 1,
+          latency: 0
         }
       });
 

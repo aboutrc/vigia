@@ -94,7 +94,7 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
       }
 
       audioRef.current.src = url;
-      audioRef.current.volume = speakerMode ? 1.0 : 0.3;
+      audioRef.current.volume = 0.05; // Set output volume to 5%
       
       audioRef.current.onended = () => {
         setCurrentPlaying(null);
