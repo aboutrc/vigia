@@ -173,9 +173,9 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
       const constraints = {
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
           sampleRate: 48000,
           channelCount: 2
         }
@@ -603,7 +603,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                 key={recording.id}
                 className="p-4 bg-gray-800 rounded-lg text-gray-100"
               >
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col">
                   <div>
                     <div className="text-sm text-gray-400">
                       {new Date(recording.created_at).toLocaleString(
@@ -611,11 +611,11 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                       )}
                     </div>
                     <div className="text-sm text-gray-400 mt-1">
-                      {recording.location}
+                      Location: {recording.location}
                     </div>
                   </div>
                   {recording.publicUrl && (
-                    <div className="flex flex-col gap-2">
+                    <div className="mt-3 flex flex-col gap-2">
                       <a
                         download={`recording_${new Date(recording.created_at).toISOString()}.${recording.recording_url.endsWith('m4a') ? 'm4a' : 'webm'}`}
                         href={recording.publicUrl}
