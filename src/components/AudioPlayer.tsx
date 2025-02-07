@@ -114,11 +114,6 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
 
   return (
     <div className="w-full max-w-2xl mt-8">
-      <h2 className="text-xl font-semibold text-gray-100 mb-4 flex items-center">
-        <Volume2 className="mr-2" />
-        Press play to hear the phrase in English
-      </h2>
-      
       {error && (
         <div className="bg-red-900/50 text-red-100 px-4 py-2 rounded-lg mb-4">
           {error}
@@ -138,7 +133,10 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-medium text-gray-100">{audio.title}</h3>
-                  <p className="text-sm text-gray-400">{audio.description}</p>
+                  <p className="text-sm text-gray-400">
+                    <Volume2 className="inline-block mr-1" size={14} />
+                    Click to play
+                  </p>
                 </div>
                 <button
                   onClick={() => generateAndPlaySpeech(audio.text)}
