@@ -307,32 +307,36 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
       )}
 
       <div className="absolute top-4 right-4 z-[1001] space-y-2">
-        <div className="w-full">
-          <LocationSearch
-            onLocationSelect={handleLocationSelect}
-            language={language}
-          />
+      </div>
+
+      {/* Moved controls down 10% */}
+      <div className="absolute top-[10%] right-4 z-[1001] space-y-2 w-72">
+        <LocationSearch
+          onLocationSelect={handleLocationSelect}
+          language={language}
+        />
+
+        <div className="flex flex-col gap-2">
+          <button
+            className="w-full px-4 py-2 bg-gray-800/90 backdrop-blur-sm text-gray-100 rounded-lg shadow-md hover:bg-gray-700 flex items-center justify-center"
+            onClick={() => setShowSidebar(!showSidebar)}
+          >
+            <List className="mr-2" size={20} />
+            {t.showList}
+          </button>
+
+          <button
+            className={`w-full px-4 py-2 rounded-lg shadow-md flex items-center justify-center ${
+              isAddingMarker
+                ? 'bg-green-600/90 backdrop-blur-sm text-white hover:bg-green-700'
+                : 'bg-gray-800/90 backdrop-blur-sm text-gray-100 hover:bg-gray-700'
+            }`}
+            onClick={() => setIsAddingMarker(!isAddingMarker)}
+          >
+            <Plus className="mr-2" size={20} />
+            {isAddingMarker ? t.clickToPlace : t.addLocation}
+          </button>
         </div>
-
-        <button
-          className="w-full px-4 py-2 bg-gray-800/90 backdrop-blur-sm text-gray-100 rounded-lg shadow-md hover:bg-gray-700 flex items-center justify-center"
-          onClick={() => setShowSidebar(!showSidebar)}
-        >
-          <List className="mr-2" size={20} />
-          {t.showList}
-        </button>
-
-        <button
-          className={`w-full px-4 py-2 rounded-lg shadow-md flex items-center justify-center ${
-            isAddingMarker
-              ? 'bg-green-600/90 backdrop-blur-sm text-white hover:bg-green-700'
-              : 'bg-gray-800/90 backdrop-blur-sm text-gray-100 hover:bg-gray-700'
-          }`}
-          onClick={() => setIsAddingMarker(!isAddingMarker)}
-        >
-          <Plus className="mr-2" size={20} />
-          {isAddingMarker ? t.clickToPlace : t.addLocation}
-        </button>
       </div>
 
       <div className={`absolute inset-y-0 left-0 w-96 bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out z-[1000] ${
