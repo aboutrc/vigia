@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Scale } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { translations } from '../translations';
 
 interface RightsProps {
@@ -34,57 +34,48 @@ const Rights = ({ language = 'en' }: RightsProps) => {
   };
 
   const renderContent = (item: string) => {
-    // Check if it's an amendment title or section header
     if ((item.includes('Amendment') || item.includes('Enmienda')) || 
         (item === "What to Do:" || item === "Qué Hacer:")) {
       return (
-        <h3 className="text-lg font-bold text-gray-100 mt-4 mb-2">
+        <h3 className="text-lg font-extrabold text-white mt-4 mb-2">
           {item}
         </h3>
       );
     }
     
-    // For bullet points, add indentation
     if (item.startsWith('•')) {
       return (
-        <div className="ml-6">
+        <div className="ml-6 font-medium text-gray-200">
           <span>{item}</span>
         </div>
       );
     }
     
-    // For empty lines
     if (item === '') {
       return <div className="py-1"></div>;
     }
     
-    // For regular content
     return (
       <div className="flex items-start">
-        <span className="mr-2">•</span>
-        <span>{item}</span>
+        <span className="mr-2 text-gray-200">•</span>
+        <span className="font-medium text-gray-200">{item}</span>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
-      <div className="max-w-2xl mx-auto space-y-4">
-        <div className="flex items-center space-x-2 text-gray-100 mb-6">
-          <Scale size={24} />
-          <h1 className="text-2xl font-semibold">{t.title}</h1>
-        </div>
-
+    <div className="min-h-screen bg-gray-900">
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
         {sections.map((section, index) => (
           <div
             key={index}
-            className="bg-black/30 backdrop-blur-sm rounded-lg overflow-hidden"
+            className="bg-black/40 backdrop-blur-sm rounded-lg overflow-hidden"
           >
             <button
               onClick={() => toggleSection(index)}
-              className="w-full px-4 py-3 flex items-center justify-between text-gray-100 hover:bg-black/40 transition-colors"
+              className="w-full px-4 py-3 flex items-center justify-between text-white hover:bg-black/50 transition-colors"
             >
-              <span className="font-medium">{section.title}</span>
+              <span className="font-bold">{section.title}</span>
               {expandedSection === index ? (
                 <ChevronDown size={20} />
               ) : (
@@ -94,7 +85,7 @@ const Rights = ({ language = 'en' }: RightsProps) => {
             
             {expandedSection === index && (
               <div className="px-4 pb-4">
-                <div className="space-y-2 text-gray-300">
+                <div className="space-y-2">
                   {section.content.map((item, i) => (
                     <div key={i}>
                       {renderContent(item)}

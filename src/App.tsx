@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Languages, Map as MapIcon, Music, Scale, FileText } from 'lucide-react';
+import { Languages, Map as MapIcon, Music, Scale, FileText, Info } from 'lucide-react';
 import { translations } from './translations';
 import Map from './components/Map';
 import Encounter from './components/Encounter';
 import Rights from './components/Rights';
 import Registro from './components/Registro';
 import Footer from './components/Footer';
+import AboutModal from './components/AboutModal';
 import { supabase } from './lib/supabase';
 import { LanguageContext } from './hooks/useLanguage';
 
 function App() {
   const [session, setSession] = useState(null);
   const [language, setLanguage] = useState<'en' | 'es'>('en');
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -39,7 +41,8 @@ function App() {
       <Router>
         <div className="min-h-screen flex flex-col bg-gray-900">
           <header className="fixed top-0 left-0 right-0 z-50 bg-black shadow-lg">
-            <div className="flex justify-center py-3">
+            <div className="relative flex items-center justify-center py-3 px-4">
+              {/* Logo */}
               <svg className="h-8" viewBox="0 0 557 212" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M78.17 209.15H52.32L0 68.85h37.28l30.46 91h.2l32.67-91h35.88l-58.32 140.3Z" fill="#fff"/>
                 <path fill="#fff" d="M151.51 68.85h32.47v140.3h-32.47z"/>
@@ -48,6 +51,17 @@ function App() {
                 <path fill="#fff" d="M370.56 209.15V68.85h32.47v140.3h-32.47z"/>
                 <path d="m519.67 209.15-8.22-24.65h-46.3l-8.82 24.65h-35.88l58.32-140.3h25.85l52.31 140.3h-37.28Zm-45.1-50.51h28.06l-13.43-40.49h-.2l-14.43 40.49Z" fill="#fff"/>
               </svg>
+
+              {/* About button - Absolute positioned */}
+              <button
+                onClick={() => setIsAboutOpen(true)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 transition-colors"
+              >
+                <Info size={16} />
+                <span className="text-xs font-medium">
+                  {language === 'es' ? 'Acerca de' : 'About'}
+                </span>
+              </button>
             </div>
             
             <div className="grid grid-cols-5 divide-x divide-gray-700 border-t border-gray-700">
@@ -114,6 +128,11 @@ function App() {
           </main>
 
           <Footer />
+          
+          <AboutModal 
+            isOpen={isAboutOpen}
+            onClose={() => setIsAboutOpen(false)}
+          />
         </div>
       </Router>
     </LanguageContext.Provider>

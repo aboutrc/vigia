@@ -23,7 +23,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isSpeakerMode, setIsSpeakerMode] = useState(false);
   
-  // Audio Context refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -37,11 +36,11 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          echoCancellation: false,  // Disable echo cancellation
-          noiseSuppression: false,  // Disable noise suppression
-          autoGainControl: false,   // Disable automatic gain control
-          channelCount: 1,          // Mono recording
-          sampleRate: 44100         // Standard sample rate
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1,
+          sampleRate: 44100
         }
       });
       
@@ -91,48 +90,38 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       const hasAccess = await checkMicrophonePermission();
       if (!hasAccess) return;
 
-      // Request microphone access with specific high-quality settings
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false,      // Disable echo cancellation
-          noiseSuppression: false,      // Disable noise suppression
-          autoGainControl: false,       // Disable automatic gain control
-          channelCount: 1,              // Mono recording
-          sampleRate: 48000,            // Higher sample rate
-          latency: 0,                   // Minimize latency
-          sampleSize: 24                // Higher bit depth
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1,
+          sampleRate: 48000,
+          latency: 0,
+          sampleSize: 24
         }
       });
 
-      // Create Audio Context with higher sample rate
       const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 48000,              // Match input sample rate
+        sampleRate: 48000,
         latencyHint: 'interactive'
       });
 
-      // Create source node
       const sourceNode = audioContext.createMediaStreamSource(stream);
-      
-      // Create processor node with larger buffer for better quality
       const processorNode = audioContext.createScriptProcessor(8192, 1, 1);
       
-      // Connect nodes
       sourceNode.connect(processorNode);
       processorNode.connect(audioContext.destination);
 
-      // Handle audio processing with gain boost
       processorNode.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
-        // Apply gain boost to capture quieter sounds
         const boostedData = new Float32Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
-          // Boost the signal (1.5x gain) while preventing clipping
           boostedData[i] = Math.max(-1, Math.min(1, inputData[i] * 1.5));
         }
         audioChunksRef.current.push(boostedData);
       };
 
-      // Store refs
       audioContextRef.current = audioContext;
       streamRef.current = stream;
       sourceNodeRef.current = sourceNode;
@@ -151,7 +140,6 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     if (!isRecording) return;
 
     try {
-      // Stop recording
       if (processorRef.current) {
         processorRef.current.disconnect();
         sourceNodeRef.current?.disconnect();
@@ -165,14 +153,12 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
         await audioContextRef.current.close();
       }
 
-      // Convert audio data to WAV
       if (audioChunksRef.current.length > 0) {
         const audioData = concatenateAudioBuffers(audioChunksRef.current);
         const wavBlob = createWavBlob(audioData);
         await saveRecording(wavBlob);
       }
 
-      // Clear refs
       audioContextRef.current = null;
       streamRef.current = null;
       sourceNodeRef.current = null;
@@ -210,28 +196,26 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     const buffer = new ArrayBuffer(44 + dataSize);
     const view = new DataView(buffer);
 
-    // Write WAV header
     const writeString = (offset: number, string: string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i));
       }
     };
 
-    writeString(0, 'RIFF');                     // ChunkID
-    view.setUint32(4, 36 + dataSize, true);     // ChunkSize
-    writeString(8, 'WAVE');                     // Format
-    writeString(12, 'fmt ');                    // Subchunk1ID
-    view.setUint32(16, 16, true);               // Subchunk1Size
-    view.setUint16(20, 1, true);                // AudioFormat (PCM)
-    view.setUint16(22, numChannels, true);      // NumChannels
-    view.setUint32(24, sampleRate, true);       // SampleRate
-    view.setUint32(28, byteRate, true);         // ByteRate
-    view.setUint16(32, blockAlign, true);       // BlockAlign
-    view.setUint16(34, bitsPerSample, true);    // BitsPerSample
-    writeString(36, 'data');                    // Subchunk2ID
-    view.setUint32(40, dataSize, true);         // Subchunk2Size
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
 
-    // Write audio data
     const offset = 44;
     for (let i = 0; i < audioData.length; i++) {
       const sample = Math.max(-1, Math.min(1, audioData[i]));
@@ -385,20 +369,19 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
-      <div className="max-w-2xl mx-auto space-y-8">
-        {/* Recording Section */}
-        <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
-          <h1 className="text-2xl font-bold text-gray-100 mb-6">
+    <div className="min-h-screen bg-gray-900">
+      <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+        <div className="bg-black/40 backdrop-blur-sm rounded-lg p-6">
+          <h2 className="text-xl font-bold text-white mb-6">
             {language === 'en' ? 'Officer Encounter' : 'Encuentro con Oficial'}
-          </h1>
+          </h2>
 
-          <p className="text-gray-300 mb-8">
+          <p className="text-gray-200 font-medium mb-8">
             Press the record button to start documenting your interaction. The recording will be saved automatically when you stop.
           </p>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-900/50 text-red-100 rounded-lg flex items-center">
+            <div className="mb-4 p-4 bg-red-900/50 text-red-100 rounded-lg flex items-center font-medium">
               <AlertTriangle className="mr-2" size={20} />
               {error}
             </div>
@@ -419,11 +402,9 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
           </div>
         </div>
 
-        {/* Quick Response Buttons */}
-        <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
+        <div className="bg-black/40 backdrop-blur-sm rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-100 flex items-center">
-              <Volume2 className="mr-2" />
+            <h2 className="text-xl font-bold text-white">
               Quick Responses
             </h2>
             <button
@@ -447,12 +428,12 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
               return (
                 <div
                   key={audio.title}
-                  className="bg-black/30 backdrop-blur-sm rounded-lg p-4 hover:bg-black/40 transition-colors"
+                  className="bg-black/40 backdrop-blur-sm rounded-lg p-4 hover:bg-black/50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-medium text-gray-100">{audio.title}</h3>
-                      <p className="text-sm text-gray-400">
+                      <h3 className="text-lg font-bold text-white">{audio.title}</h3>
+                      <p className="text-sm font-medium text-gray-300">
                         Click to play
                       </p>
                     </div>
@@ -484,9 +465,8 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
           </div>
         </div>
 
-        {/* Saved Recordings Section */}
-        <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-100 mb-4">
+        <div className="bg-black/40 backdrop-blur-sm rounded-lg p-6">
+          <h2 className="text-xl font-bold text-white mb-4">
             Saved Recordings
           </h2>
           
@@ -494,16 +474,16 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
             {recordings.map((recording) => (
               <div 
                 key={recording.id}
-                className="p-4 bg-gray-800 rounded-lg text-gray-100"
+                className="p-4 bg-black/40 rounded-lg text-white"
               >
                 <div className="flex flex-col">
                   <div>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm font-medium text-gray-300">
                       Date & Time: {new Date(recording.created_at).toLocaleString(
                         language === 'es' ? 'es-ES' : 'en-US'
                       )}
                     </div>
-                    <div className="text-sm text-gray-400 mt-1">
+                    <div className="text-sm font-medium text-gray-300 mt-1">
                       Location: {recording.location}
                     </div>
                   </div>
@@ -512,14 +492,14 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
                       href={recording.public_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full"
+                      className="p-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 w-full font-medium"
                     >
                       <LinkIcon size={16} />
                       <span className="text-xs whitespace-nowrap">Download Recording</span>
                     </a>
                     <button
                       onClick={() => copyToClipboard(recording.public_url)}
-                      className={`p-2 rounded-lg transition-colors flex items-center justify-center gap-2 w-full ${
+                      className={`p-2 rounded-lg transition-colors flex items-center justify-center gap-2 w-full font-medium ${
                         copiedUrl === recording.public_url
                           ? 'bg-green-600'
                           : 'bg-gray-700 hover:bg-gray-600'
@@ -535,7 +515,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
               </div>
             ))}
             {recordings.length === 0 && (
-              <div className="text-center text-gray-400">
+              <div className="text-center text-gray-400 font-medium">
                 No recordings yet
               </div>
             )}
