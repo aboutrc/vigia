@@ -15,6 +15,8 @@ export interface Marker {
   confirmationsCount?: number;
   lastStatusChange?: string;
   isEditing?: boolean;
+  reliabilityScore?: number;
+  negativeConfirmations?: number;
 }
 
 export interface MarkerFormData {

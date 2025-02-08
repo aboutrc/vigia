@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, AlertTriangle, Link as LinkIcon, Copy, Volume2 } from 'lucide-react';
+import { Mic, Square, AlertTriangle, Link as LinkIcon, Copy, Volume2, VolumeX } from 'lucide-react';
 import { translations } from '../translations';
 import { supabase } from '../lib/supabase';
 import { audioStatements } from '../lib/audioStatements';
@@ -21,6 +21,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isSpeakerMode, setIsSpeakerMode] = useState(false);
   
   // Audio Context refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -29,9 +30,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioChunksRef = useRef<Float32Array[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const retryCountRef = useRef(0);
-  const maxRetries = 3;
-  
+
   const t = translations[language];
 
   const checkMicrophonePermission = async (): Promise<boolean> => {
@@ -316,6 +315,13 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
     }
   };
 
+  const toggleSpeakerMode = () => {
+    setIsSpeakerMode(!isSpeakerMode);
+    if (audioRef.current) {
+      audioRef.current.volume = !isSpeakerMode ? 1.0 : 0.3;
+    }
+  };
+
   const generateAndPlaySpeech = async (text: string) => {
     try {
       if (currentPlaying === text) {
@@ -330,42 +336,28 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       setIsGenerating(true);
       setError(null);
       
-      const makeRequest = async (retryCount: number): Promise<Response> => {
-        try {
-          const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
-            },
-            body: JSON.stringify({
-              text,
-              model_id: "eleven_monolingual_v1",
-              voice_settings: {
-                stability: 0.75,
-                similarity_boost: 0.75,
-                style: 0.0,
-                use_speaker_boost: true
-              }
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text,
+          model_id: "eleven_monolingual_v1",
+          voice_settings: {
+            stability: 0.75,
+            similarity_boost: 0.75,
+            style: 0.0,
+            use_speaker_boost: true
           }
+        })
+      });
 
-          return response;
-        } catch (err) {
-          if (retryCount < maxRetries) {
-            console.log(`Retry attempt ${retryCount + 1}/${maxRetries}`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return makeRequest(retryCount + 1);
-          }
-          throw err;
-        }
-      };
+      if (!response.ok) {
+        throw new Error('Failed to generate speech');
+      }
 
-      const response = await makeRequest(0);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 
@@ -374,7 +366,7 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
       }
 
       audioRef.current.src = url;
-      audioRef.current.volume = 1.0; // Set to full volume for better recording
+      audioRef.current.volume = isSpeakerMode ? 1.0 : 0.3;
       
       audioRef.current.onended = () => {
         setCurrentPlaying(null);
@@ -429,10 +421,23 @@ const Registro = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
 
         {/* Quick Response Buttons */}
         <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-100 mb-4 flex items-center">
-            <Volume2 className="mr-2" />
-            Quick Responses
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-100 flex items-center">
+              <Volume2 className="mr-2" />
+              Quick Responses
+            </h2>
+            <button
+              onClick={toggleSpeakerMode}
+              className={`p-2 rounded-lg transition-colors ${
+                isSpeakerMode 
+                  ? 'bg-blue-600 hover:bg-blue-700' 
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+              title={isSpeakerMode ? 'Speaker Mode On' : 'Speaker Mode Off'}
+            >
+              {isSpeakerMode ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+          </div>
           
           <div className="grid gap-4">
             {audioStatements.map((audio) => {

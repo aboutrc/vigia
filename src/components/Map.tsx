@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl';
-import { ThumbsUp, List, Plus } from 'lucide-react';
+import { ThumbsUp, List, Plus, AlertTriangle } from 'lucide-react';
 import { Marker as MarkerType, MarkerCategory, MarkerFormData } from '../types';
 import MarkerForm from './MarkerForm';
 import MarkerList from './MarkerList';
@@ -33,6 +33,20 @@ interface MapProps {
   isGuest?: boolean;
   language?: 'en' | 'es';
 }
+
+const getMarkerColor = (marker: MarkerType) => {
+  if (!marker.reliabilityScore) return marker.category === 'police' ? '#ef4444' : '#3b82f6';
+  
+  // Color gets more transparent as reliability decreases
+  const baseColor = marker.category === 'police' ? '239, 68, 68' : '59, 130, 246';
+  const opacity = 0.2 + (marker.reliabilityScore * 0.8); // Minimum opacity of 0.2
+  return `rgba(${baseColor}, ${opacity})`;
+};
+
+const getMarkerSize = (marker: MarkerType) => {
+  if (!marker.reliabilityScore) return 1; // Default size multiplier
+  return 0.7 + (marker.reliabilityScore * 0.3); // Size between 0.7-1.0 based on reliability
+};
 
 function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
   const [markers, setMarkers] = useState<MarkerType[]>([]);
@@ -92,7 +106,9 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
           active: marker.active,
           lastConfirmed: marker.last_confirmed,
           confirmationsCount: marker.confirmations_count,
-          lastStatusChange: marker.last_status_change
+          lastStatusChange: marker.last_status_change,
+          reliabilityScore: marker.reliability_score,
+          negativeConfirmations: marker.negative_confirmations
         }));
         setMarkers(formattedMarkers);
       }
@@ -126,6 +142,8 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
       upvotes: 0,
       createdAt: new Date(),
       isEditing: true,
+      reliabilityScore: 1.0,
+      negativeConfirmations: 0
     };
 
     setTempMarker(newMarker);
@@ -179,36 +197,20 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
   };
 
   const handleConfirm = async (markerId: string, isActive: boolean) => {
-    if (!session?.user?.id) return;
-
     try {
-      const { error: confirmError } = await supabase
-        .from('marker_confirmations')
-        .insert({
-          marker_id: markerId,
-          user_id: session.user.id,
-          is_active: isActive
-        });
+      const { error } = await supabase.rpc('handle_marker_confirmation', {
+        marker_id: markerId,
+        is_present: isActive,
+        user_ip: 'anonymous' // In a real app, you'd want to get the actual IP
+      });
 
-      if (confirmError) {
-        console.error('Error confirming marker:', confirmError);
-        setError(t.errors.general);
-        return;
-      }
-
-      const { error: updateError } = await supabase
-        .from('markers')
-        .update({
-          active: isActive,
-          last_confirmed: new Date().toISOString(),
-          confirmations_count: isActive ? supabase.sql`confirmations_count + 1` : 1,
-          last_status_change: new Date().toISOString()
-        })
-        .eq('id', markerId);
-
-      if (updateError) {
-        console.error('Error updating marker:', updateError);
-        setError(t.errors.general);
+      if (error) {
+        if (error.message.includes('Too many confirmations')) {
+          setError('You have made too many confirmations recently. Please wait a while.');
+        } else {
+          console.error('Error confirming marker:', error);
+          setError(t.errors.general);
+        }
         return;
       }
 
@@ -277,7 +279,9 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
           active: data.active,
           lastConfirmed: data.last_confirmed,
           confirmationsCount: data.confirmations_count,
-          lastStatusChange: data.last_status_change
+          lastStatusChange: data.last_status_change,
+          reliabilityScore: data.reliability_score,
+          negativeConfirmations: data.negative_confirmations
         };
 
         setSelectedMarker(updatedMarker);
@@ -306,10 +310,6 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
         </div>
       )}
 
-      <div className="absolute top-4 right-4 z-[1001] space-y-2">
-      </div>
-
-      {/* Moved controls down 10% */}
       <div className="absolute top-[10%] right-4 z-[1001] space-y-2 w-72">
         <LocationSearch
           onLocationSelect={handleLocationSelect}
@@ -418,7 +418,8 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
             longitude={marker.position.lng}
             latitude={marker.position.lat}
             onClick={() => handleMarkerClick(marker)}
-            color={marker.category === 'police' ? '#ef4444' : '#3b82f6'}
+            color={getMarkerColor(marker)}
+            scale={getMarkerSize(marker)}
           >
             {selectedMarker?.id === marker.id && (
               <Popup
@@ -431,8 +432,11 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
                 className="marker-popup"
               >
                 <div className="p-4 min-w-[250px] bg-gray-900 text-gray-100 rounded-lg">
-                  <div className="font-semibold text-xl mb-3">
-                    {t.categories[marker.category]}
+                  <div className="font-semibold text-xl mb-3 flex items-center justify-between">
+                    <span>{t.categories[marker.category]}</span>
+                    {marker.reliabilityScore && marker.reliabilityScore < 0.5 && (
+                      <AlertTriangle className="text-yellow-500" size={20} title="Low reliability" />
+                    )}
                   </div>
                   
                   <div className="space-y-2 text-sm">
@@ -445,6 +449,17 @@ function MapComponent({ session, isGuest = false, language = 'en' }: MapProps) {
                     <div>
                       {t.confirmations}: {marker.confirmationsCount || 0}
                     </div>
+                    {marker.reliabilityScore && (
+                      <div className="mt-2">
+                        <div className="text-xs text-gray-400 mb-1">Reliability</div>
+                        <div className="w-full bg-gray-700 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 rounded-full h-2 transition-all duration-300"
+                            style={{ width: `${marker.reliabilityScore * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 flex justify-between items-center gap-2">

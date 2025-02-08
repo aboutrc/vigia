@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, MessageSquarePlus } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, MessageSquarePlus } from 'lucide-react';
 import { audioCache } from '../lib/audioCache';
 import { audioStatements } from '../lib/audioStatements';
 import { translations } from '../translations';
@@ -16,13 +16,22 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translatedMessage, setTranslatedMessage] = useState('');
+  const [isSpeakerMode, setIsSpeakerMode] = useState(speakerMode);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
-  const stopCurrentAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setCurrentPlaying(null);
+  const initializeAudioContext = () => {
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+          latencyHint: 'interactive',
+          sampleRate: 44100
+        });
+      } catch (err) {
+        console.error('Failed to initialize AudioContext:', err);
+        setError('Failed to initialize audio system');
+      }
     }
   };
 
@@ -62,11 +71,14 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
       if (!text.trim()) return;
 
       if (currentPlaying === text) {
-        stopCurrentAudio();
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+        setCurrentPlaying(null);
         return;
       }
 
-      stopCurrentAudio();
       setIsGenerating(true);
       setError(null);
 
@@ -81,6 +93,9 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
         }
       }
 
+      // Initialize audio context when needed
+      initializeAudioContext();
+
       const audioUrl = await audioCache.getAudio(audioText);
 
       if (!audioRef.current) {
@@ -88,7 +103,18 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
       }
 
       audioRef.current.src = audioUrl;
-      audioRef.current.volume = speakerMode ? 1.0 : 0.3;
+      audioRef.current.volume = isSpeakerMode ? 1.0 : 0.3;
+
+      if (audioContextRef.current && audioRef.current) {
+        // Disconnect any existing source
+        if (sourceNodeRef.current) {
+          sourceNodeRef.current.disconnect();
+        }
+
+        // Create and connect new source
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+        sourceNodeRef.current.connect(audioContextRef.current.destination);
+      }
       
       audioRef.current.onended = () => {
         setCurrentPlaying(null);
@@ -105,18 +131,44 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
     }
   };
 
+  const toggleSpeakerMode = () => {
+    setIsSpeakerMode(!isSpeakerMode);
+    if (audioRef.current) {
+      audioRef.current.volume = !isSpeakerMode ? 1.0 : 0.3;
+    }
+  };
+
   useEffect(() => {
     return () => {
-      stopCurrentAudio();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+      }
     };
   }, []);
 
   return (
     <div className="w-full max-w-2xl mt-8">
-      <h2 className="text-xl font-semibold text-gray-100 mb-4 flex items-center">
-        <Volume2 className="mr-2" />
-        Press play to hear the phrase in English
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-100 flex items-center">
+          <Volume2 className="mr-2" />
+          Press play to hear the phrase in English
+        </h2>
+        <button
+          onClick={toggleSpeakerMode}
+          className={`p-2 rounded-lg transition-colors ${
+            isSpeakerMode 
+              ? 'bg-blue-600 hover:bg-blue-700' 
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+          title={isSpeakerMode ? 'Speaker Mode On' : 'Speaker Mode Off'}
+        >
+          {isSpeakerMode ? <Volume2 size={20} /> : <VolumeX size={20} />}
+        </button>
+      </div>
       
       {error && (
         <div className="bg-red-900/50 text-red-100 px-4 py-2 rounded-lg mb-4">
@@ -137,6 +189,9 @@ const EncounterPremadeButtons = ({ speakerMode = false }: EncounterPremadeButton
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-medium text-gray-100">{audio.title}</h3>
+                  <p className="text-sm text-gray-400">
+                    Click to play
+                  </p>
                 </div>
                 <button
                   onClick={() => generateAndPlaySpeech(audio.text)}

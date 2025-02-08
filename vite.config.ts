@@ -17,9 +17,11 @@ export default defineConfig({
         name: 'Vigia',
         short_name: 'Vigia',
         description: 'Community Map Markers',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#000000',
+        background_color: '#000000',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: '/icon-192x192.png',
@@ -59,5 +61,6 @@ export default defineConfig({
       }
     }
   },
-  publicDir: 'public'
+  publicDir: 'public',
+  base: '/' // Ensure base URL is set correctly
 });

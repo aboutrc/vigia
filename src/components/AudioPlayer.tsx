@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Play, Volume2 } from 'lucide-react';
+import { Play, Volume2, VolumeX } from 'lucide-react';
 
 interface AudioFile {
   title: string;
@@ -48,7 +48,29 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSpeakerMode, setIsSpeakerMode] = useState(speakerMode);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
+  const retryDelay = 2000; // 2 seconds
+
+  const initializeAudioContext = () => {
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+          latencyHint: 'interactive',
+          sampleRate: 44100
+        });
+      } catch (err) {
+        console.error('Failed to initialize AudioContext:', err);
+        setError('Failed to initialize audio system');
+      }
+    }
+  };
+
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const generateAndPlaySpeech = async (text: string) => {
     try {
@@ -64,37 +86,64 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
       setIsGenerating(true);
       setError(null);
       
-      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_monolingual_v1",
-          voice_settings: {
-            stability: 0.75,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true
+      const generateSpeech = async (attempt: number): Promise<Blob> => {
+        try {
+          const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/pqHfZKP75CvOlQylNhV4', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+            },
+            body: JSON.stringify({
+              text,
+              model_id: "eleven_monolingual_v1",
+              voice_settings: {
+                stability: 0.75,
+                similarity_boost: 0.75,
+                style: 0.0,
+                use_speaker_boost: true
+              }
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
-        })
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate speech');
-      }
+          return await response.blob();
+        } catch (err) {
+          if (attempt < maxRetries) {
+            console.log(`Attempt ${attempt} failed, retrying in ${retryDelay}ms...`);
+            await delay(retryDelay);
+            return generateSpeech(attempt + 1);
+          }
+          throw err;
+        }
+      };
 
-      const blob = await response.blob();
+      const blob = await generateSpeech(1);
       const url = URL.createObjectURL(blob);
 
       if (!audioRef.current) {
         audioRef.current = new Audio();
       }
 
+      // Initialize audio context when needed
+      initializeAudioContext();
+
       audioRef.current.src = url;
-      audioRef.current.volume = 0.05; // Set output volume to 5%
+      audioRef.current.volume = isSpeakerMode ? 1.0 : 0.3;
+
+      if (audioContextRef.current && audioRef.current) {
+        // Disconnect any existing source
+        if (sourceNodeRef.current) {
+          sourceNodeRef.current.disconnect();
+        }
+
+        // Create and connect new source
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+        sourceNodeRef.current.connect(audioContextRef.current.destination);
+      }
       
       audioRef.current.onended = () => {
         setCurrentPlaying(null);
@@ -103,12 +152,20 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
 
       await audioRef.current.play();
       setCurrentPlaying(text);
+      retryCountRef.current = 0; // Reset retry count on success
     } catch (err) {
       console.error('Speech generation error:', err);
-      setError('Failed to generate speech. Please try again.');
+      setError('Failed to generate speech. Please check your internet connection and try again.');
       setCurrentPlaying(null);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const toggleSpeakerMode = () => {
+    setIsSpeakerMode(!isSpeakerMode);
+    if (audioRef.current) {
+      audioRef.current.volume = !isSpeakerMode ? 1.0 : 0.3;
     }
   };
 
@@ -120,6 +177,24 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
         </div>
       )}
       
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-100 flex items-center">
+          <Volume2 className="mr-2" />
+          Press play to hear the phrase in English
+        </h2>
+        <button
+          onClick={toggleSpeakerMode}
+          className={`p-2 rounded-lg transition-colors ${
+            isSpeakerMode 
+              ? 'bg-blue-600 hover:bg-blue-700' 
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+          title={isSpeakerMode ? 'Speaker Mode On' : 'Speaker Mode Off'}
+        >
+          {isSpeakerMode ? <Volume2 size={20} /> : <VolumeX size={20} />}
+        </button>
+      </div>
+
       <div className="grid gap-4">
         {audioFiles.map((audio) => {
           const isPlaying = currentPlaying === audio.text;
