@@ -1,3 +1,4 @@
+// CRITICAL: These statements must remain in English as they are sent directly to ElevenLabs
 export const audioStatements = [
   {
     title: "Notify Recording",

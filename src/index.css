@@ -28,6 +28,19 @@
   animation: progress 3s linear;
 }
 
+@keyframes scroll {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 20s linear infinite;
+}
+
 /* Custom popup styling */
 .marker-popup .maplibregl-popup-content {
   padding: 0 !important;
