@@ -12,55 +12,25 @@ const Rights = ({ language = 'en' }: RightsProps) => {
 
   const sections = [
     {
-      ...t.sections.constitution,
+      title: t.sections.constitution.title,
       content: t.sections.constitution.content
     },
     {
-      ...t.sections.amendments,
+      title: t.sections.amendments.title,
       content: t.sections.amendments.content
     },
     {
-      ...t.sections.iceHome,
+      title: t.sections.iceHome.title,
       content: t.sections.iceHome.content
     },
     {
-      ...t.sections.iceStreet,
+      title: t.sections.iceStreet.title,
       content: t.sections.iceStreet.content
     }
   ];
 
   const toggleSection = (index: number) => {
     setExpandedSection(current => current === index ? null : index);
-  };
-
-  const renderContent = (item: string) => {
-    if ((item.includes('Amendment') || item.includes('Enmienda')) || 
-        (item === "What to Do:" || item === "Qué Hacer:")) {
-      return (
-        <h3 className="text-lg font-extrabold text-white mt-4 mb-2">
-          {item}
-        </h3>
-      );
-    }
-    
-    if (item.startsWith('•')) {
-      return (
-        <div className="ml-6 font-medium text-gray-200">
-          <span>{item}</span>
-        </div>
-      );
-    }
-    
-    if (item === '') {
-      return <div className="py-1"></div>;
-    }
-    
-    return (
-      <div className="flex items-start">
-        <span className="mr-2 text-gray-200">•</span>
-        <span className="font-medium text-gray-200">{item}</span>
-      </div>
-    );
   };
 
   return (
@@ -75,7 +45,7 @@ const Rights = ({ language = 'en' }: RightsProps) => {
               onClick={() => toggleSection(index)}
               className="w-full px-4 py-3 flex items-center justify-between text-white hover:bg-black/50 transition-colors"
             >
-              <span className="font-bold">{section.title}</span>
+              <span className="text-base font-medium">{section.title}</span>
               {expandedSection === index ? (
                 <ChevronDown size={20} />
               ) : (
@@ -86,10 +56,10 @@ const Rights = ({ language = 'en' }: RightsProps) => {
             {expandedSection === index && (
               <div className="px-4 pb-4">
                 <div className="space-y-2">
-                  {section.content.map((item, i) => (
-                    <div key={i}>
-                      {renderContent(item)}
-                    </div>
+                  {section.content.map((text, i) => (
+                    <p key={i} className="text-gray-300">
+                      {text}
+                    </p>
                   ))}
                 </div>
               </div>

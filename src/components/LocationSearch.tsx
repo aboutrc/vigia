@@ -84,7 +84,7 @@ export default function LocationSearch({ onLocationSelect, language = 'en' }: Lo
       )}
 
       {isOpen && results.length > 0 && (
-        <div className="absolute top-full mt-2 w-full bg-black/90 backdrop-blur-md rounded-lg shadow-xl border border-gray-700 max-h-60 overflow-y-auto">
+        <div className="absolute top-full mt-2 w-full bg-black/90 backdrop-blur-md rounded-lg shadow-xl border border-gray-700 max-h-60 overflow-y-auto z-50">
           {results.map((result, index) => (
             <button
               key={index}

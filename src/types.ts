@@ -7,16 +7,7 @@ export interface Marker {
     lng: number;
   };
   category: MarkerCategory;
-  upvotes: number;
   createdAt: Date;
-  user_id?: string;
-  active?: boolean;
-  lastConfirmed?: string;
-  confirmationsCount?: number;
-  lastStatusChange?: string;
-  isEditing?: boolean;
-  reliabilityScore?: number;
-  negativeConfirmations?: number;
 }
 
 export interface MarkerFormData {

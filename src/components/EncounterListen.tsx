@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Mic } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mic, AlertTriangle } from 'lucide-react';
 import { translations } from '../translations';
 
 interface EncounterListenProps {
@@ -12,9 +12,29 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
   const [englishText, setEnglishText] = useState('');
   const [spanishText, setSpanishText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [permissionState, setPermissionState] = useState<PermissionState | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const t = translations[language];
+
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'microphone' as PermissionName })
+        .then(permissionStatus => {
+          setPermissionState(permissionStatus.state);
+          
+          permissionStatus.onchange = () => {
+            setPermissionState(permissionStatus.state);
+            if (permissionStatus.state === 'granted') {
+              setError(null);
+            }
+          };
+        })
+        .catch(err => {
+          console.error('Permission query error:', err);
+        });
+    }
+  }, []);
 
   const translateText = async (text: string) => {
     try {
@@ -50,18 +70,42 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
     }
   };
 
-  const startRecording = async () => {
+  const requestMicrophonePermission = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
-          noiseSuppression: false,
-          autoGainControl: false,
-          sampleRate: 44100,
-          channelCount: 1,
-          latency: 0
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
+      
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err: any) {
+      console.error('Microphone permission error:', err);
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError(language === 'es' 
+          ? 'Acceso al micrófono denegado. Por favor, permita el acceso al micrófono en la configuración de su navegador.'
+          : 'Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError(language === 'es'
+          ? 'No se encontró micrófono. Por favor, conecte un micrófono e intente de nuevo.'
+          : 'No microphone found. Please connect a microphone and try again.');
+      } else {
+        setError(language === 'es'
+          ? 'No se puede acceder al micrófono. Por favor, verifique la configuración de su dispositivo.'
+          : 'Unable to access microphone. Please check your device settings.');
+      }
+      return false;
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) return;
 
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         throw new Error('Speech recognition is not supported in your browser');
@@ -73,11 +117,6 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
-      
-      // Clean up the stream when stopping
-      recognitionRef.current.onaudioend = () => {
-        stream.getTracks().forEach(track => track.stop());
-      };
 
       recognitionRef.current.onresult = async (event: any) => {
         let interimTranscript = '';
@@ -100,13 +139,21 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
         console.error('Speech recognition error:', event.error);
         
         if (event.error === 'not-allowed') {
-          setError('Microphone access was denied. Please allow microphone access in your browser settings.');
+          setError(language === 'es'
+            ? 'Acceso al micrófono denegado. Por favor, permita el acceso al micrófono en la configuración de su navegador.'
+            : 'Microphone access was denied. Please allow microphone access in your browser settings.');
         } else if (event.error === 'audio-capture') {
-          setError('No microphone found. Please connect a microphone and try again.');
+          setError(language === 'es'
+            ? 'No se encontró micrófono. Por favor, conecte un micrófono e intente de nuevo.'
+            : 'No microphone found. Please connect a microphone and try again.');
         } else if (event.error === 'network') {
-          setError('Network error occurred. Please check your connection.');
+          setError(language === 'es'
+            ? 'Error de red. Por favor, verifique su conexión.'
+            : 'Network error occurred. Please check your connection.');
         } else if (event.error !== 'no-speech') {
-          setError('Speech recognition error. Please try again.');
+          setError(language === 'es'
+            ? 'Error de reconocimiento de voz. Por favor, intente de nuevo.'
+            : 'Speech recognition error. Please try again.');
         }
         
         setIsRecording(false);
@@ -133,12 +180,18 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
       
       if (err instanceof Error) {
         if (err.message.includes('Speech recognition')) {
-          setError('Speech recognition is not supported in your browser. Please try using Chrome or Edge.');
+          setError(language === 'es'
+            ? 'El reconocimiento de voz no está soportado en su navegador. Por favor, use Chrome o Edge.'
+            : 'Speech recognition is not supported in your browser. Please try using Chrome or Edge.');
         } else {
-          setError('Failed to start recording. Please check microphone permissions.');
+          setError(language === 'es'
+            ? 'Error al iniciar la grabación. Por favor, verifique los permisos del micrófono.'
+            : 'Failed to start recording. Please check microphone permissions.');
         }
       } else {
-        setError('An unknown error occurred. Please try again.');
+        setError(language === 'es'
+          ? 'Ocurrió un error desconocido. Por favor, intente de nuevo.'
+          : 'An unknown error occurred. Please try again.');
       }
     }
   };
@@ -150,20 +203,24 @@ const EncounterListen = ({ language = 'en' }: EncounterListenProps) => {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
-
   return (
     <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6 min-h-[200px]">
       <div className="space-y-4">
+        {permissionState === 'denied' && (
+          <div className="bg-red-900/50 text-red-100 px-4 py-3 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={20} className="flex-shrink-0" />
+            <span>
+              {language === 'es'
+                ? 'El acceso al micrófono está bloqueado. Por favor, haga clic en el icono del candado en la barra de direcciones y permita el acceso al micrófono.'
+                : 'Microphone access is blocked. Please click the lock icon in the address bar and allow microphone access.'}
+            </span>
+          </div>
+        )}
+        
         {error && (
-          <div className="bg-red-900/50 text-red-100 px-4 py-2 rounded-lg mb-4">
-            {error}
+          <div className="bg-red-900/50 text-red-100 px-4 py-3 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={20} className="flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 

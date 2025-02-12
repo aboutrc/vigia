@@ -1,48 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Play, Volume2, VolumeX } from 'lucide-react';
-
-interface AudioFile {
-  title: string;
-  text: string;
-  description: string;
-}
+import { audioStatements } from '../lib/audioStatements';
 
 interface AudioPlayerProps {
   speakerMode?: boolean;
 }
-
-const audioFiles: AudioFile[] = [
-  {
-    title: "Fifth Amendment Rights",
-    text: "I do not wish to speak with you, answer your questions, or sign or hand you any documents, based on my Fifth Amendment rights under the United States Constitution.",
-    description: "Invoke Fifth Amendment rights"
-  },
-  {
-    title: "Fourth Amendment Rights",
-    text: "I do not give you permission to enter my home, based on my Fourth Amendment rights under the United States Constitution, unless you have a warrant to enter, signed by a judge or magistrate, with my name on it that you slide under the door.",
-    description: "Invoke Fourth Amendment rights"
-  },
-  {
-    title: "Warrant Request",
-    text: "Please slide the warrant to enter, signed by a judge or magistrate, with my name on it that you slide under the door. If you do not have one, I do not wish to speak with you, answer your questions, or sign or hand you any documents, based on my Fifth Amendment rights under the United States Constitution.",
-    description: "Request warrant under door"
-  },
-  {
-    title: "Search Permission",
-    text: "I do not give you permission to search any of my belongings based on my 4th amendment rights.",
-    description: "Deny search permission"
-  },
-  {
-    title: "Identify Authority",
-    text: "Can you please identify yourself. Are you with local law enforcement or with Immigration and Customs Enforcement.",
-    description: "Request authority identification"
-  },
-  {
-    title: "Badge Numbers",
-    text: "I would request badge numbers from all officers present.",
-    description: "Request badge numbers"
-  }
-];
 
 const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
@@ -50,25 +12,8 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSpeakerMode, setIsSpeakerMode] = useState(speakerMode);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const retryCountRef = useRef<number>(0);
   const maxRetries = 3;
-  const retryDelay = 2000; // 2 seconds
-
-  const initializeAudioContext = () => {
-    if (!audioContextRef.current) {
-      try {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-          latencyHint: 'interactive',
-          sampleRate: 44100
-        });
-      } catch (err) {
-        console.error('Failed to initialize AudioContext:', err);
-        setError('Failed to initialize audio system');
-      }
-    }
-  };
+  const retryDelay = 2000;
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -113,7 +58,6 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
           return await response.blob();
         } catch (err) {
           if (attempt < maxRetries) {
-            console.log(`Attempt ${attempt} failed, retrying in ${retryDelay}ms...`);
             await delay(retryDelay);
             return generateSpeech(attempt + 1);
           }
@@ -128,22 +72,8 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
         audioRef.current = new Audio();
       }
 
-      // Initialize audio context when needed
-      initializeAudioContext();
-
       audioRef.current.src = url;
       audioRef.current.volume = isSpeakerMode ? 1.0 : 0.3;
-
-      if (audioContextRef.current && audioRef.current) {
-        // Disconnect any existing source
-        if (sourceNodeRef.current) {
-          sourceNodeRef.current.disconnect();
-        }
-
-        // Create and connect new source
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
-        sourceNodeRef.current.connect(audioContextRef.current.destination);
-      }
       
       audioRef.current.onended = () => {
         setCurrentPlaying(null);
@@ -152,10 +82,9 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
 
       await audioRef.current.play();
       setCurrentPlaying(text);
-      retryCountRef.current = 0; // Reset retry count on success
     } catch (err) {
       console.error('Speech generation error:', err);
-      setError('Failed to generate speech. Please check your internet connection and try again.');
+      setError('Failed to generate speech. Please try again.');
       setCurrentPlaying(null);
     } finally {
       setIsGenerating(false);
@@ -196,7 +125,7 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
       </div>
 
       <div className="grid gap-4">
-        {audioFiles.map((audio) => {
+        {audioStatements.map((audio) => {
           const isPlaying = currentPlaying === audio.text;
           const isDisabled = isGenerating && currentPlaying !== audio.text;
 

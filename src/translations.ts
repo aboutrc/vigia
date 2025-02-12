@@ -41,15 +41,6 @@ export const translations = {
     passwordPlaceholder: 'Password',
     createAccountTitle: 'Create your account',
     signInTitle: 'Sign in to your account',
-    registro: {
-      title: 'Proof',
-      recordings: 'Recordings',
-      notifyRecording: 'Notify Recording',
-      constitutionalRights: 'Constitutional Rights',
-      badgeNumber: 'Badge Number',
-      freeToGo: 'Free to Go',
-      goodbye: 'Goodbye'
-    },
     rights: {
       title: 'Know Your Rights',
       sections: {
@@ -158,15 +149,6 @@ export const translations = {
     passwordPlaceholder: 'Contraseña',
     createAccountTitle: 'Crea tu cuenta',
     signInTitle: 'Inicia sesión en tu cuenta',
-    registro: {
-      title: 'Registro',
-      recordings: 'Grabaciones',
-      notifyRecording: 'Notificar Grabación',
-      constitutionalRights: 'Derechos Constitucionales',
-      badgeNumber: 'Número de Placa',
-      freeToGo: 'Libre para Irse',
-      goodbye: 'Despedida'
-    },
     rights: {
       title: 'Conoce Tus Derechos',
       sections: {
