@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl/maplibre';
 import { MapPin, Plus, List, AlertTriangle, CheckCircle } from 'lucide-react';
 import { translations } from '../translations';
@@ -38,6 +38,8 @@ function MapComponent({ language = 'en' }: MapProps) {
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapRef = useRef<any>(null);
   const t = translations[language];
 
   const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
@@ -80,7 +82,7 @@ function MapComponent({ language = 'en' }: MapProps) {
   }, []);
 
   const handleMapClick = useCallback((event) => {
-    if (!isAddingMarker) return;
+    if (!isAddingMarker || !mapLoaded) return;
 
     const { lngLat } = event;
     
@@ -101,7 +103,7 @@ function MapComponent({ language = 'en' }: MapProps) {
 
     setSelectedMarker(newMarker);
     setIsAddingMarker(false);
-  }, [isAddingMarker]);
+  }, [isAddingMarker, mapLoaded]);
 
   const handleConfirm = async (markerId: string, isActive: boolean) => {
     try {
@@ -142,6 +144,8 @@ function MapComponent({ language = 'en' }: MapProps) {
           ? 'Gracias por tu confirmación' 
           : 'Thank you for your confirmation'
       );
+      
+      setSelectedMarker(null);
       await fetchMarkers();
     } catch (err) {
       console.error('Error confirming marker:', err);
@@ -165,6 +169,14 @@ function MapComponent({ language = 'en' }: MapProps) {
       zoom: 16
     });
   };
+
+  // Handle missing images
+  const handleMissingImage = useCallback((e: any) => {
+    const { id } = e;
+    console.warn(`Missing image: ${id}`);
+    // Return a 1x1 transparent pixel as fallback
+    return new ImageData(1, 1);
+  }, []);
 
   return (
     <div className="h-screen w-screen relative">
@@ -274,6 +286,12 @@ function MapComponent({ language = 'en' }: MapProps) {
         minZoom={3}
         maxZoom={19}
         mapLib={import('maplibre-gl')}
+        onLoad={() => setMapLoaded(true)}
+        onError={(e) => console.error('Map error:', e)}
+        ref={mapRef}
+        renderWorldCopies={false}
+        preserveDrawingBuffer={true}
+        onStyleImageMissing={handleMissingImage}
       >
         <GeolocateControl
           position="top-left"
@@ -302,75 +320,82 @@ function MapComponent({ language = 'en' }: MapProps) {
             longitude={marker.position.lng}
             latitude={marker.position.lat}
             onClick={() => setSelectedMarker(marker)}
-            color={getMarkerColor(marker)}
           >
-            {selectedMarker?.id === marker.id && (
-              <Popup
-                longitude={marker.position.lng}
-                latitude={marker.position.lat}
-                onClose={() => setSelectedMarker(null)}
-                closeButton={true}
-                closeOnClick={false}
-                anchor="bottom"
-                className="marker-popup"
-              >
-                <div className="p-4 min-w-[250px] bg-gray-900 text-gray-100 rounded-lg">
-                  <div className="font-semibold text-xl mb-3 flex items-center justify-between">
-                    <span>{t.categories[marker.category]}</span>
-                    {marker.reliabilityScore && marker.reliabilityScore < 0.5 && (
-                      <AlertTriangle className="text-yellow-500" size={20} title="Low reliability" />
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      {t.lastConfirmed}: {marker.lastConfirmed ? 
-                        new Date(marker.lastConfirmed).toLocaleString(language === 'es' ? 'es-ES' : 'en-US') : 
-                        'N/A'
-                      }
-                    </div>
-                    <div>
-                      {t.confirmations}: {marker.confirmationsCount || 0}
-                    </div>
-                    {marker.reliabilityScore && (
-                      <div className="mt-2">
-                        <div className="text-xs text-gray-400 mb-1">Reliability</div>
-                        <div className="w-full bg-gray-700 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 rounded-full h-2 transition-all duration-300"
-                            style={{ width: `${marker.reliabilityScore * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex justify-between items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleConfirm(marker.id, true);
-                      }}
-                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors"
-                    >
-                      {t.stillPresent}
-                    </button>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleConfirm(marker.id, false);
-                      }}
-                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
-                    >
-                      {t.notPresent}
-                    </button>
-                  </div>
-                </div>
-              </Popup>
-            )}
+            <div className="cursor-pointer">
+              <MapPin
+                size={24}
+                color={getMarkerColor(marker)}
+                className="transform -translate-x-1/2 -translate-y-1/2"
+              />
+            </div>
           </Marker>
         ))}
+
+        {selectedMarker && (
+          <Popup
+            longitude={selectedMarker.position.lng}
+            latitude={selectedMarker.position.lat}
+            onClose={() => setSelectedMarker(null)}
+            closeButton={true}
+            closeOnClick={false}
+            anchor="bottom"
+            className="marker-popup"
+          >
+            <div className="p-4 min-w-[250px] bg-gray-900 text-gray-100 rounded-lg">
+              <div className="font-semibold text-xl mb-3 flex items-center justify-between">
+                <span>{t.categories[selectedMarker.category]}</span>
+                {selectedMarker.reliabilityScore && selectedMarker.reliabilityScore < 0.5 && (
+                  <AlertTriangle className="text-yellow-500" size={20} title="Low reliability" />
+                )}
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div>
+                  {t.lastConfirmed}: {selectedMarker.lastConfirmed ? 
+                    new Date(selectedMarker.lastConfirmed).toLocaleString(language === 'es' ? 'es-ES' : 'en-US') : 
+                    'N/A'
+                  }
+                </div>
+                <div>
+                  {t.confirmations}: {selectedMarker.confirmationsCount || 0}
+                </div>
+                {selectedMarker.reliabilityScore && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-400 mb-1">Reliability</div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 rounded-full h-2 transition-all duration-300"
+                        style={{ width: `${selectedMarker.reliabilityScore * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex justify-between items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfirm(selectedMarker.id, true);
+                  }}
+                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors"
+                >
+                  {t.stillPresent}
+                </button>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfirm(selectedMarker.id, false);
+                  }}
+                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                >
+                  {t.notPresent}
+                </button>
+              </div>
+            </div>
+          </Popup>
+        )}
       </Map>
     </div>
   );

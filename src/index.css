@@ -77,3 +77,12 @@
   background: transparent !important;
   color: #d1d5db !important;
 }
+
+/* Case Law styling */
+.CaseLaw_Emphasis {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #60a5fa;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}

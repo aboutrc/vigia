@@ -87,6 +87,30 @@ export const translations = {
             'You have the right to refuse to show identification or answer questions',
             'Remember, you do not have to sign any documents without speaking to an attorney'
           ]
+        },
+        caseLaw: {
+          title: 'Important Legal Cases',
+          content: [
+            'Yick Wo v. Hopkins (1886)',
+            'Established that the Equal Protection Clause of the 14th Amendment applies to all persons, not just citizens, reinforcing constitutional protections for immigrants.',
+            'Learn more: https://en.wikipedia.org/wiki/Yick_Wo_v._Hopkins',
+            '',
+            'Zadvydas v. Davis (2001)',
+            'Limited the government\'s power to indefinitely detain immigrants who have been ordered removed but cannot be deported.',
+            'Learn more: https://en.wikipedia.org/wiki/Zadvydas_v._Davis',
+            '',
+            'Plyler v. Doe (1982)',
+            'Established that states cannot deny public education to undocumented immigrant children.',
+            'Learn more: https://en.wikipedia.org/wiki/Plyler_v._Doe',
+            '',
+            'INS v. Lopez-Mendoza (1984)',
+            'Addressed Fourth Amendment protections in immigration proceedings.',
+            'Learn more: https://en.wikipedia.org/wiki/INS_v._Lopez-Mendoza',
+            '',
+            'Boumediene v. Bush (2008)',
+            'Extended constitutional protections to non-citizens in U.S. territory.',
+            'Learn more: https://en.wikipedia.org/wiki/Boumediene_v._Bush'
+          ]
         }
       }
     },
@@ -194,6 +218,30 @@ export const translations = {
             'Pregunta si eres libre de irte. Si dicen que sí, aléjate calmadamente',
             'Tienes derecho a negarte a mostrar identificación o responder preguntas',
             'Recuerda, no tienes que firmar ningún documento sin hablar con un abogado'
+          ]
+        },
+        caseLaw: {
+          title: 'Casos Legales Importantes',
+          content: [
+            'Yick Wo v. Hopkins (1886)',
+            'Estableció que la Cláusula de Protección Igualitaria de la 14ª Enmienda se aplica a todas las personas, no solo a los ciudadanos, reforzando las protecciones constitucionales para inmigrantes.',
+            'Más información: https://en.wikipedia.org/wiki/Yick_Wo_v._Hopkins',
+            '',
+            'Zadvydas v. Davis (2001)',
+            'Limitó el poder del gobierno para detener indefinidamente a inmigrantes que han recibido orden de deportación pero no pueden ser deportados.',
+            'Más información: https://en.wikipedia.org/wiki/Zadvydas_v._Davis',
+            '',
+            'Plyler v. Doe (1982)',
+            'Estableció que los estados no pueden negar educación pública a niños inmigrantes indocumentados.',
+            'Más información: https://en.wikipedia.org/wiki/Plyler_v._Doe',
+            '',
+            'INS v. Lopez-Mendoza (1984)',
+            'Abordó las protecciones de la Cuarta Enmienda en procedimientos de inmigración.',
+            'Más información: https://en.wikipedia.org/wiki/INS_v._Lopez-Mendoza',
+            '',
+            'Boumediene v. Bush (2008)',
+            'Extendió las protecciones constitucionales a no ciudadanos en territorio estadounidense.',
+            'Más información: https://en.wikipedia.org/wiki/Boumediene_v._Bush'
           ]
         }
       }
