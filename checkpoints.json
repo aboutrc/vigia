@@ -1,0 +1,70 @@
+{
+  "checkpoints": [
+    {
+      "name": "Day 1 Checkpoint",
+      "date": "2025-02-13",
+      "description": "Initial stable version with working Encounter, Rights, and Proof sections",
+      "knownIssues": [
+        {
+          "type": "compatibility",
+          "description": "Missing Firefox Map Integration",
+          "impact": "high",
+          "status": "pending"
+        }
+      ],
+      "protectedComponents": [
+        "src/components/Encounter.tsx",
+        "src/components/EncounterListen.tsx",
+        "src/components/AudioPlayer.tsx",
+        "src/components/EncounterButtons.tsx",
+        "src/components/EncounterSpeak.tsx",
+        "src/components/Rights.tsx",
+        "src/components/Registro.tsx"
+      ],
+      "protectedMigrations": "All migrations up to 20250212182818_ancient_dune.sql",
+      "criticalDependencies": {
+        "@supabase/supabase-js": "^2.39.7",
+        "uuid": "^9.0.1"
+      },
+      "environmentVariables": [
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_ANON_KEY",
+        "VITE_ELEVENLABS_API_KEY",
+        "VITE_GOOGLE_MAPS_API_KEY"
+      ],
+      "features": {
+        "encounter": {
+          "status": "stable",
+          "capabilities": [
+            "Speech-to-text translation",
+            "Pre-recorded audio responses",
+            "Real-time audio processing",
+            "Bilingual support"
+          ]
+        },
+        "rights": {
+          "status": "stable",
+          "capabilities": [
+            "Constitutional rights information",
+            "Immigration rights guidance",
+            "Bilingual content",
+            "Case law references",
+            "Expandable sections"
+          ]
+        },
+        "registro": {
+          "status": "stable",
+          "capabilities": [
+            "Audio recording",
+            "Recording storage",
+            "Recording playback",
+            "Location tracking",
+            "Session management",
+            "Recording sharing"
+          ]
+        }
+      }
+    }
+  ],
+  "currentCheckpoint": "Day 1 Checkpoint"
+}

@@ -39,6 +39,9 @@ function MapComponent({ language = 'en' }: MapProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [pendingMarker, setPendingMarker] = useState<{lat: number; lng: number} | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<MarkerCategory>('ice');
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const mapRef = useRef<any>(null);
   const t = translations[language];
 
@@ -81,27 +84,21 @@ function MapComponent({ language = 'en' }: MapProps) {
     fetchMarkers();
   }, []);
 
-  const handleMapClick = useCallback((event) => {
+  const handleMapClick = useCallback((event: any) => {
     if (!isAddingMarker || !mapLoaded) return;
 
-    const { lngLat } = event;
+    // Get click coordinates
+    const { lng, lat } = event.lngLat;
     
-    if (lngLat.lng < US_BOUNDS.minLng || lngLat.lng > US_BOUNDS.maxLng ||
-        lngLat.lat < US_BOUNDS.minLat || lngLat.lat > US_BOUNDS.maxLat) {
+    // Validate coordinates are within US bounds
+    if (lng < US_BOUNDS.minLng || lng > US_BOUNDS.maxLng ||
+        lat < US_BOUNDS.minLat || lat > US_BOUNDS.maxLat) {
       return;
     }
 
-    const newMarker: MarkerType = {
-      id: `temp-${Date.now()}`,
-      position: { lat: lngLat.lat, lng: lngLat.lng },
-      category: 'ice',
-      createdAt: new Date(),
-      active: true,
-      reliabilityScore: 1.0,
-      negativeConfirmations: 0
-    };
-
-    setSelectedMarker(newMarker);
+    // Set pending marker and show category dialog
+    setPendingMarker({ lat, lng });
+    setShowCategoryDialog(true);
     setIsAddingMarker(false);
   }, [isAddingMarker, mapLoaded]);
 
@@ -153,6 +150,53 @@ function MapComponent({ language = 'en' }: MapProps) {
     }
   };
 
+  const handleCategorySelect = async () => {
+    if (!pendingMarker) return;
+
+    try {
+      // Add marker to database
+      const { data, error } = await supabase
+        .from('markers')
+        .insert({
+          latitude: pendingMarker.lat,
+          longitude: pendingMarker.lng,
+          category: selectedCategory,
+          active: true,
+          title: `${selectedCategory.toUpperCase()} Sighting`,
+          description: `${selectedCategory.toUpperCase()} activity reported in this area`
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newMarker: MarkerType = {
+          id: data.id,
+          position: { lat: data.latitude, lng: data.longitude },
+          category: data.category as MarkerCategory,
+          createdAt: new Date(data.created_at),
+          active: data.active,
+          reliabilityScore: 1.0,
+          negativeConfirmations: 0
+        };
+
+        setMarkers(prev => [...prev, newMarker]);
+        showFeedback(
+          language === 'es'
+            ? 'Marcador agregado exitosamente'
+            : 'Marker added successfully'
+        );
+      }
+    } catch (err) {
+      console.error('Error adding marker:', err);
+      showFeedback(t.errors?.general || 'Error adding marker', 'error');
+    } finally {
+      setPendingMarker(null);
+      setShowCategoryDialog(false);
+    }
+  };
+
   const getMarkerColor = (marker: MarkerType) => {
     if (!marker.reliabilityScore) return marker.category === 'police' ? '#ef4444' : '#3b82f6';
     
@@ -169,14 +213,6 @@ function MapComponent({ language = 'en' }: MapProps) {
       zoom: 16
     });
   };
-
-  // Handle missing images
-  const handleMissingImage = useCallback((e: any) => {
-    const { id } = e;
-    console.warn(`Missing image: ${id}`);
-    // Return a 1x1 transparent pixel as fallback
-    return new ImageData(1, 1);
-  }, []);
 
   return (
     <div className="h-screen w-screen relative">
@@ -220,6 +256,57 @@ function MapComponent({ language = 'en' }: MapProps) {
               <CheckCircle className="mr-2 flex-shrink-0" size={20} />
             )}
             <span className="text-sm font-medium">{feedback.message}</span>
+          </div>
+        </div>
+      )}
+
+      {showCategoryDialog && pendingMarker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1002]">
+          <div className="bg-gray-900 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-white mb-4">
+              {language === 'es' ? 'Seleccionar Categoría' : 'Select Category'}
+            </h3>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setSelectedCategory('ice')}
+                  className={`flex-1 px-4 py-2 rounded-lg ${
+                    selectedCategory === 'ice'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  ICE
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('police')}
+                  className={`flex-1 px-4 py-2 rounded-lg ${
+                    selectedCategory === 'police'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  {language === 'es' ? 'Policía' : 'Police'}
+                </button>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setPendingMarker(null);
+                    setShowCategoryDialog(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-700 text-gray-300 rounded-lg"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleCategorySelect}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg"
+                >
+                  {language === 'es' ? 'Guardar' : 'Save'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -287,11 +374,10 @@ function MapComponent({ language = 'en' }: MapProps) {
         maxZoom={19}
         mapLib={import('maplibre-gl')}
         onLoad={() => setMapLoaded(true)}
-        onError={(e) => console.error('Map error:', e)}
         ref={mapRef}
         renderWorldCopies={false}
         preserveDrawingBuffer={true}
-        onStyleImageMissing={handleMissingImage}
+        attributionControl={false}
       >
         <GeolocateControl
           position="top-left"
@@ -319,7 +405,10 @@ function MapComponent({ language = 'en' }: MapProps) {
             key={marker.id}
             longitude={marker.position.lng}
             latitude={marker.position.lat}
-            onClick={() => setSelectedMarker(marker)}
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              setSelectedMarker(marker);
+            }}
           >
             <div className="cursor-pointer">
               <MapPin
