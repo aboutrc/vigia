@@ -90,7 +90,37 @@
           ]
         }
       }
+    },
+    {
+      "name": "Pre-Menu Changes",
+      "date": "2025-02-13",
+      "description": "Checkpoint before menu modifications",
+      "knownIssues": [],
+      "protectedComponents": [
+        "src/components/Map.tsx",
+        "src/components/Encounter.tsx",
+        "src/components/Rights.tsx",
+        "src/components/Registro.tsx"
+      ],
+      "criticalDependencies": {
+        "@supabase/supabase-js": "^2.39.7",
+        "maplibre-gl": "^3.6.2",
+        "react-map-gl": "^7.1.7",
+        "uuid": "^9.0.1"
+      },
+      "features": {
+        "all": {
+          "status": "stable",
+          "capabilities": [
+            "Supabase integration",
+            "Map functionality",
+            "Audio processing",
+            "Rights information",
+            "Recording system"
+          ]
+        }
+      }
     }
   ],
-  "currentCheckpoint": "Firefox Compatibility Fix"
+  "currentCheckpoint": "Pre-Menu Changes"
 }

@@ -8,14 +8,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
-        persistSession: false, // Don't persist auth session
-        autoRefreshToken: false, // Don't auto refresh token
-        detectSessionInUrl: false // Don't detect session in URL
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
       },
-      global: {
-        headers: {
-          'X-Client-Info': 'vigia-app'
-        }
+      db: {
+        schema: 'public'
       }
     })
   : null;
@@ -27,17 +25,22 @@ export const isSupabaseConfigured = () => {
 
 // Helper function to test Supabase connection
 export const testSupabaseConnection = async () => {
-  if (!supabase) return false;
+  if (!isSupabaseConfigured()) {
+    console.info('Supabase is not configured. Please connect using the "Connect to Supabase" button.');
+    return false;
+  }
   
   try {
-    const { data, error } = await supabase.from('markers').select('count');
+    const { error } = await supabase!.from('markers').select('id').limit(1);
     if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is OK
-      console.error('Supabase connection test failed:', error);
-      return false;
+      throw error;
     }
     return true;
   } catch (err) {
-    console.error('Supabase connection test failed:', err);
+    // Only log as error if it's not due to missing configuration
+    if (isSupabaseConfigured()) {
+      console.error('Supabase connection test failed:', err);
+    }
     return false;
   }
 };
