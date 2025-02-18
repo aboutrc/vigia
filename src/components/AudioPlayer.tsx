@@ -13,7 +13,7 @@ const AudioPlayer = ({ speakerMode = false, useEncounterStatements = false, lang
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSpeakerMode, setIsSpeakerMode] = useState(speakerMode);
-  const [isApiConfigured, setIsApiConfigured] = useState(false);
+  const [isApiConfigured, setIsApiConfigured] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const maxRetries = 3;
   const retryDelay = 2000;
@@ -21,12 +21,7 @@ const AudioPlayer = ({ speakerMode = false, useEncounterStatements = false, lang
   const statements = useEncounterStatements ? encounterStatements : proofStatements;
 
   useEffect(() => {
-    // Check if ElevenLabs API key is configured
-    const hasApiKey = Boolean(import.meta.env.VITE_ELEVENLABS_API_KEY);
-    setIsApiConfigured(hasApiKey);
-    if (!hasApiKey) {
-      setError('ElevenLabs API key is not configured. Please check your environment variables.');
-    }
+    setIsApiConfigured(true);
   }, []);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -56,7 +51,7 @@ const AudioPlayer = ({ speakerMode = false, useEncounterStatements = false, lang
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+              'xi-api-key': 'sk_fc3cf065a531918b6de89add71bc3cf8633fdcc4c225e29b'
             },
             body: JSON.stringify({
               text,

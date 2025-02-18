@@ -14,33 +14,58 @@ export const supabase = supabaseUrl && supabaseAnonKey
       },
       db: {
         schema: 'public'
+      },
+      global: {
+        headers: {
+          'X-Client-Info': 'vigia@1.0.0',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       }
     })
   : null;
 
 // Helper function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  return Boolean(supabaseUrl && supabaseAnonKey && supabase);
+  const hasConfig = Boolean(supabaseUrl && supabaseAnonKey && supabase);
+  if (!hasConfig) {
+    console.warn('Supabase configuration is missing. Please check your environment variables.');
+  }
+  return hasConfig;
 };
 
-// Helper function to test Supabase connection
-export const testSupabaseConnection = async () => {
+// Helper function to test Supabase connection with retries
+export const testSupabaseConnection = async (retryCount = 0, maxRetries = 3) => {
   if (!isSupabaseConfigured()) {
-    console.info('Supabase is not configured. Please connect using the "Connect to Supabase" button.');
+    console.warn('Supabase is not configured');
     return false;
   }
-  
+
   try {
-    const { error } = await supabase!.from('markers').select('id').limit(1);
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is OK
+    console.info(`Supabase connection attempt ${retryCount + 1}`);
+    const { data, error } = await supabase!.from('markers')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+      
+    // PGRST116 means no rows found, which is OK
+    if (error && error.code !== 'PGRST116') {
       throw error;
     }
+    
     return true;
   } catch (err) {
-    // Only log as error if it's not due to missing configuration
-    if (isSupabaseConfigured()) {
-      console.error('Supabase connection test failed:', err);
+    console.error(`Supabase connection attempt ${retryCount + 1} failed:`, err);
+    
+    if (retryCount < maxRetries) {
+      // Exponential backoff: wait longer between each retry
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return testSupabaseConnection(retryCount + 1, maxRetries);
     }
+    
     return false;
   }
 };

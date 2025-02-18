@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl/maplibre';
-import { MapPin, Plus, List, AlertTriangle, Database } from 'lucide-react';
+import { MapPin, Plus, AlertTriangle, Database, CheckCircle } from 'lucide-react';
 import { translations } from '../translations';
 import { supabase, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import type { Marker as MarkerType, MarkerCategory } from '../types';
 import LocationSearch from './LocationSearch';
+import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // US bounds
 const US_BOUNDS = {
@@ -25,10 +27,9 @@ const INITIAL_VIEW_STATE = {
 // MapTiler API key
 const MAPTILER_KEY = 'SuHEhypMCIOnIZIVbC95';
 
-function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
+const MapComponent = ({ language = 'en' }: { language?: 'en' | 'es' }) => {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [isAddingMarker, setIsAddingMarker] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
   const [markers, setMarkers] = useState<MarkerType[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<MarkerType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const mapRef = useRef<any>(null);
+  const isMobile = useIsMobile();
   const t = translations[language];
 
   const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
@@ -246,6 +248,8 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
       zoom: 16
     });
   };
+  
+  const markerSize = 30;
 
   return (
     <div className="h-screen w-screen relative">
@@ -275,7 +279,7 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
         </div>
       )}
 
-      <div className="absolute top-[10%] right-4 z-[1001] space-y-2 w-72">
+      <div className={`absolute ${isMobile ? 'top-32' : 'top-[calc(15%+20px)]'} right-4 z-[1001] space-y-2 w-72`}>
         <button
           className={`w-full px-4 py-2 rounded-lg shadow-md flex items-center justify-center ${
             isAddingMarker
@@ -286,14 +290,6 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
         >
           <Plus className="mr-2" size={20} />
           {isAddingMarker ? t.clickToPlace : t.addLocation}
-        </button>
-
-        <button
-          className="w-full px-4 py-2 bg-gray-800/90 backdrop-blur-sm text-gray-100 rounded-lg shadow-md hover:bg-gray-700 flex items-center justify-center"
-          onClick={() => setShowSidebar(!showSidebar)}
-        >
-          <List className="mr-2" size={20} />
-          {t.showList}
         </button>
 
         <div className="relative">
@@ -370,55 +366,6 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
         </div>
       )}
 
-      {showSidebar && (
-        <div className="absolute inset-y-0 left-0 w-96 bg-gray-800/90 backdrop-blur-sm shadow-xl transform transition-transform duration-300 ease-in-out z-[1000]">
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-gray-100 mb-4">{t.title}</h2>
-            <div className="space-y-4">
-              {markers.map((marker) => (
-                <div
-                  key={marker.id}
-                  className="p-4 bg-black/30 rounded-lg hover:bg-black/40 transition-colors cursor-pointer"
-                  onClick={() => {
-                    setSelectedMarker(marker);
-                    setViewState({
-                      ...viewState,
-                      longitude: marker.position.lng,
-                      latitude: marker.position.lat,
-                      zoom: 14
-                    });
-                    setShowSidebar(false);
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <MapPin 
-                      className="flex-shrink-0"
-                      size={20}
-                      color={getMarkerColor(marker)}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-300">
-                        {t.categories[marker.category]}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(marker.createdAt).toLocaleDateString(
-                          language === 'es' ? 'es-ES' : 'en-US'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {markers.length === 0 && (
-                <div className="text-center text-gray-400">
-                  {t.noMarkers}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <Map
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
@@ -431,33 +378,38 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
         ]}
         minZoom={3}
         maxZoom={19}
-        mapLib={import('maplibre-gl')}
-        onLoad={() => setMapLoaded(true)}
+        mapLib={maplibregl}
+        onLoad={() => {
+          setMapLoaded(true);
+        }}
         ref={mapRef}
         renderWorldCopies={false}
         preserveDrawingBuffer={true}
         attributionControl={false}
       >
-        <GeolocateControl
-          position="top-left"
-          trackUserLocation
-          showUserLocation
-          showAccuracyCircle
-          fitBoundsOptions={{ maxZoom: 16 }}
-          positionOptions={{
-            enableHighAccuracy: true,
-            timeout: 6000,
-            maximumAge: 0
-          }}
-          onGeolocate={(e) => {
-            setUserLocation({
-              lat: e.coords.latitude,
-              lng: e.coords.longitude
-            });
-          }}
-          auto
-        />
-        <NavigationControl position="top-left" />
+        {mapLoaded && (
+          <>
+            <GeolocateControl
+              position="top-left"
+              trackUserLocation
+              showUserLocation
+              showAccuracyCircle
+              fitBoundsOptions={{ maxZoom: 16 }}
+              positionOptions={{
+                enableHighAccuracy: true,
+                timeout: 6000,
+                maximumAge: 0
+              }}
+              onGeolocate={(e) => {
+                setUserLocation({
+                  lat: e.coords.latitude,
+                  lng: e.coords.longitude
+                });
+              }}
+            />
+            <NavigationControl position="top-left" />
+          </>
+        )}
 
         {markers.map((marker) => (
           <Marker
@@ -471,9 +423,9 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
           >
             <div className="cursor-pointer">
               <MapPin
-                size={24}
+                size={markerSize}
                 color={getMarkerColor(marker)}
-                className="transform -translate-x-1/2 -translate-y-1/2"
+                className="transform -translate-x-1/2 -translate-y-1/2 transition-colors"
               />
             </div>
           </Marker>
@@ -547,6 +499,6 @@ function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
       </Map>
     </div>
   );
-}
+};
 
 export default MapComponent;

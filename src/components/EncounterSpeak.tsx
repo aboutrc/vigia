@@ -169,7 +169,7 @@ const EncounterSpeak = ({ isActive, onError, isSpeakerMode, language = 'en' }: E
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'xi-api-key': import.meta.env.VITE_ELEVENLABS_API_KEY
+          'xi-api-key': 'sk_fc3cf065a531918b6de89add71bc3cf8633fdcc4c225e29b'
         },
         body: JSON.stringify({
           text,

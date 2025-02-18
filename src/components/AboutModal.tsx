@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ArrowUpRight } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 
 interface AboutModalProps {
@@ -59,22 +59,9 @@ const AboutModal = ({ isOpen, onClose }: AboutModalProps) => {
                 }
               </p>
               <div className="text-center">
-                <p className="text-gray-400 mb-2">
-                  {language === 'es' 
-                    ? '¿Quieres saber más sobre cómo se creó esta aplicación?' 
-                    : 'Want to learn more about how this app came to be?'}
+                <p className="text-gray-400 mb-4">
+                  This is a project built by Rafael "RC" Concepcion - If you want to read what inspired this, read it at my blog: <a href="http://aboutrc.com/?p=7682" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">aboutrc.com</a>
                 </p>
-                <a
-                  href="/background-story.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-1.5"
-                >
-                  <span className="underline">
-                    {language === 'es' ? 'Lee nuestra historia' : 'Read our story'}
-                  </span>
-                  <ArrowUpRight size={16} />
-                </a>
               </div>
             </section>
 
@@ -295,29 +282,8 @@ const AboutModal = ({ isOpen, onClose }: AboutModalProps) => {
               </div>
             </section>
 
-            {/* Bottom section with close button and story link */}
+            {/* Bottom section with close button */}
             <div className="flex flex-col items-center gap-4 pt-4">
-              {/* Story Link */}
-              <div className="text-center">
-                <p className="text-gray-400 mb-2">
-                  {language === 'es' 
-                    ? '¿Quieres saber más sobre cómo se creó esta aplicación?' 
-                    : 'Want to learn more about how this app came to be?'}
-                </p>
-                <a
-                  href="/background-story.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-1.5"
-                >
-                  <span className="underline">
-                    {language === 'es' ? 'Lee nuestra historia' : 'Read our story'}
-                  </span>
-                  <ArrowUpRight size={16} />
-                </a>
-              </div>
-
-              {/* Close button */}
               <button
                 onClick={onClose}
                 className="px-6 py-2 bg-gray-800 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors font-medium"

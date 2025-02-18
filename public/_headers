@@ -1,14 +1,17 @@
 /*
-  Access-Control-Allow-Origin: *
-  Permissions-Policy: microphone=self geolocation=self
-  Content-Security-Policy: default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: https://*.supabase.co https://*.google.com https://api.elevenlabs.io https://raw.githubusercontent.com https://translation.googleapis.com blob: https://*.maptiler.com; media-src 'self' https: blob: https://*.supabase.co https://*.githubusercontent.com; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; img-src 'self' https: data: blob: https://*.maptiler.com
-  Cross-Origin-Embedder-Policy: unsafe-none
-  Cross-Origin-Opener-Policy: same-origin
+  Access-Control-Allow-Origin: https://opzqmoaimiqiiflivqtq.supabase.co
+  Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+  Access-Control-Allow-Headers: *
+  Access-Control-Expose-Headers: Content-Range, Range
+  Access-Control-Allow-Credentials: true
   Cross-Origin-Resource-Policy: cross-origin
-  Access-Control-Allow-Methods: GET, POST, OPTIONS
-  Access-Control-Allow-Headers: DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization
+  Content-Security-Policy: default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: https://*.supabase.co https://*.google.com https://api.elevenlabs.io https://raw.githubusercontent.com blob: https://*.maptiler.com; media-src 'self' https: blob: https://*.supabase.co https://*.githubusercontent.com https://api.elevenlabs.io; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; img-src 'self' https: data: blob: https://*.maptiler.com
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: no-cache, must-revalidate, max-age=0, private
+  Pragma: no-cache
+  Expires: 0
+  Clear-Site-Data: "cache", "storage"

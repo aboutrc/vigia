@@ -99,3 +99,60 @@
   font-style: italic;
   color: rgb(156 163 175);
 }
+
+/* Hide scrollbar but maintain functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile-specific styles */
+@supports (-webkit-touch-callout: none) {
+  .scrollbar-hide {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+}
+
+/* Mobile-specific map control styles */
+@media (max-width: 768px) {
+  .maplibregl-ctrl-top-left,
+  .maplibregl-ctrl-top-right,
+  .maplibregl-ctrl-bottom-left,
+  .maplibregl-ctrl-bottom-right {
+    position: absolute !important;
+    margin: 10px !important;
+    z-index: 100 !important;
+  }
+
+  .maplibregl-ctrl-group {
+    margin: 0 !important;
+    background-color: white !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .maplibregl-ctrl button {
+    width: 40px !important;
+    height: 40px !important;
+    color: #000 !important;
+  }
+
+  .maplibregl-ctrl-icon {
+    background-size: 20px !important;
+    filter: invert(1) !important;
+  }
+}
+
+/* iOS-specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .maplibregl-ctrl-group {
+    background-color: white !important;
+  }
+}
