@@ -9,7 +9,7 @@
           "type": "compatibility",
           "description": "Missing Firefox Map Integration",
           "impact": "high",
-          "status": "pending"
+          "status": "resolved"
         }
       ],
       "protectedComponents": [
@@ -64,7 +64,33 @@
           ]
         }
       }
+    },
+    {
+      "name": "Firefox Compatibility Fix",
+      "date": "2025-02-13",
+      "description": "Fixed map marker dialog and color coding issues in Firefox",
+      "knownIssues": [],
+      "protectedComponents": [
+        "src/components/Map.tsx"
+      ],
+      "criticalDependencies": {
+        "maplibre-gl": "^3.6.2",
+        "react-map-gl": "^7.1.7"
+      },
+      "features": {
+        "map": {
+          "status": "stable",
+          "capabilities": [
+            "Cross-browser marker placement",
+            "Category selection dialog",
+            "Color-coded markers",
+            "Real-time updates",
+            "Location search",
+            "Marker confirmation"
+          ]
+        }
+      }
     }
   ],
-  "currentCheckpoint": "Day 1 Checkpoint"
+  "currentCheckpoint": "Firefox Compatibility Fix"
 }

@@ -60,29 +60,42 @@
 .marker-popup .maplibregl-popup-content {
   padding: 0 !important;
   background: transparent !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   overflow: hidden !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 .marker-popup .maplibregl-popup-close-button {
-  padding: 0.5rem !important;
+  padding: 0.75rem !important;
   color: white !important;
   font-size: 1.25rem !important;
-  right: 0.25rem !important;
-  top: 0.25rem !important;
+  right: 0.5rem !important;
+  top: 0.5rem !important;
   z-index: 1 !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 0.5rem !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  cursor: pointer !important;
 }
 
 .marker-popup .maplibregl-popup-close-button:hover {
-  background: transparent !important;
+  background: rgba(0, 0, 0, 0.4) !important;
   color: #d1d5db !important;
 }
 
 /* Case Law styling */
 .CaseLaw_Emphasis {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #60a5fa;
-  margin-bottom: 0.5rem;
-  line-height: 1.4;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: rgb(156 163 175);
 }

@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Map, { Marker, Popup, NavigationControl, GeolocateControl } from 'react-map-gl/maplibre';
-import { MapPin, Plus, List, AlertTriangle, CheckCircle } from 'lucide-react';
+import { MapPin, Plus, List, AlertTriangle, Database } from 'lucide-react';
 import { translations } from '../translations';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import type { Marker as MarkerType, MarkerCategory } from '../types';
 import LocationSearch from './LocationSearch';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -25,11 +25,7 @@ const INITIAL_VIEW_STATE = {
 // MapTiler API key
 const MAPTILER_KEY = 'SuHEhypMCIOnIZIVbC95';
 
-interface MapProps {
-  language?: 'en' | 'es';
-}
-
-function MapComponent({ language = 'en' }: MapProps) {
+function MapComponent({ language = 'en' }: { language?: 'en' | 'es' }) {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [isAddingMarker, setIsAddingMarker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -42,6 +38,7 @@ function MapComponent({ language = 'en' }: MapProps) {
   const [pendingMarker, setPendingMarker] = useState<{lat: number; lng: number} | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<MarkerCategory>('ice');
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const mapRef = useRef<any>(null);
   const t = translations[language];
 
@@ -50,8 +47,42 @@ function MapComponent({ language = 'en' }: MapProps) {
     setTimeout(() => setFeedback(null), 5000);
   };
 
+  const checkSupabaseConnection = async () => {
+    try {
+      if (!isSupabaseConfigured()) {
+        setError(language === 'es' 
+          ? 'Error de conexión a la base de datos. Por favor, conecte a Supabase usando el botón "Connect to Supabase".'
+          : 'Database connection error. Please connect to Supabase using the "Connect to Supabase" button.');
+        return;
+      }
+
+      const isConnected = await testSupabaseConnection();
+      setIsSupabaseConnected(isConnected);
+      setError(null);
+      
+      if (isConnected) {
+        await fetchMarkers();
+      }
+    } catch (err) {
+      console.error('Supabase connection error:', err);
+      setIsSupabaseConnected(false);
+      setError(language === 'es' 
+        ? 'Error de conexión a la base de datos. Por favor, conecte a Supabase usando el botón "Connect to Supabase".'
+        : 'Database connection error. Please connect to Supabase using the "Connect to Supabase" button.');
+    }
+  };
+
+  useEffect(() => {
+    checkSupabaseConnection();
+  }, []);
+
   const fetchMarkers = async () => {
     try {
+      if (!isSupabaseConnected) {
+        await checkSupabaseConnection();
+        if (!isSupabaseConnected) return;
+      }
+
       const { data, error } = await supabase
         .from('markers')
         .select('*')
@@ -81,8 +112,10 @@ function MapComponent({ language = 'en' }: MapProps) {
   };
 
   useEffect(() => {
-    fetchMarkers();
-  }, []);
+    if (isSupabaseConnected) {
+      fetchMarkers();
+    }
+  }, [isSupabaseConnected]);
 
   const handleMapClick = useCallback((event: any) => {
     if (!isAddingMarker || !mapLoaded) return;
@@ -216,6 +249,32 @@ function MapComponent({ language = 'en' }: MapProps) {
 
   return (
     <div className="h-screen w-screen relative">
+      {!isSupabaseConnected && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1002] px-4">
+          <div className="bg-[#1a1f2e] p-8 rounded-2xl shadow-2xl w-full max-w-md mx-auto border border-gray-700/50">
+            <div className="flex items-center justify-center mb-6 text-blue-500">
+              <Database size={48} />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">
+              {language === 'es' ? 'Conexión Requerida' : 'Connection Required'}
+            </h3>
+            <p className="text-gray-300 text-center mb-6">
+              {language === 'es'
+                ? 'Por favor, conecte a Supabase usando el botón "Connect to Supabase" en la esquina superior derecha.'
+                : 'Please connect to Supabase using the "Connect to Supabase" button in the top right corner.'}
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={checkSupabaseConnection}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-lg font-medium"
+              >
+                {language === 'es' ? 'Reintentar Conexión' : 'Retry Connection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="absolute top-[10%] right-4 z-[1001] space-y-2 w-72">
         <button
           className={`w-full px-4 py-2 rounded-lg shadow-md flex items-center justify-center ${
@@ -261,47 +320,47 @@ function MapComponent({ language = 'en' }: MapProps) {
       )}
 
       {showCategoryDialog && pendingMarker && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1002]">
-          <div className="bg-gray-900 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-white mb-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1002] px-4">
+          <div className="bg-[#1a1f2e] p-8 rounded-2xl shadow-2xl w-full max-w-md mx-auto border border-gray-700/50">
+            <h3 className="text-2xl font-bold text-white mb-6">
               {language === 'es' ? 'Seleccionar Categoría' : 'Select Category'}
             </h3>
-            <div className="space-y-4">
-              <div className="flex gap-4">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => setSelectedCategory('ice')}
-                  className={`flex-1 px-4 py-2 rounded-lg ${
+                  className={`w-full px-6 py-4 rounded-xl text-lg font-medium transition-all ${
                     selectedCategory === 'ice'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                      ? 'bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-2 ring-offset-[#1a1f2e]'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
                   ICE
                 </button>
                 <button
                   onClick={() => setSelectedCategory('police')}
-                  className={`flex-1 px-4 py-2 rounded-lg ${
+                  className={`w-full px-6 py-4 rounded-xl text-lg font-medium transition-all ${
                     selectedCategory === 'police'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                      ? 'bg-red-600 text-white ring-2 ring-red-400 ring-offset-2 ring-offset-[#1a1f2e]'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
                   {language === 'es' ? 'Policía' : 'Police'}
                 </button>
               </div>
-              <div className="flex gap-4">
+              <div className="grid grid-cols-2 gap-4 pt-2">
                 <button
                   onClick={() => {
                     setPendingMarker(null);
                     setShowCategoryDialog(false);
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-700 text-gray-300 rounded-lg"
+                  className="w-full px-6 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors text-lg font-medium"
                 >
                   {language === 'es' ? 'Cancelar' : 'Cancel'}
                 </button>
                 <button
                   onClick={handleCategorySelect}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg"
+                  className="w-full px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-lg font-medium"
                 >
                   {language === 'es' ? 'Guardar' : 'Save'}
                 </button>
@@ -430,28 +489,28 @@ function MapComponent({ language = 'en' }: MapProps) {
             anchor="bottom"
             className="marker-popup"
           >
-            <div className="p-4 min-w-[250px] bg-gray-900 text-gray-100 rounded-lg">
-              <div className="font-semibold text-xl mb-3 flex items-center justify-between">
+            <div className="p-6 min-w-[300px] bg-[#1a1f2e] text-gray-100 rounded-xl border border-gray-700/50">
+              <div className="font-bold text-2xl mb-4 flex items-center justify-between">
                 <span>{t.categories[selectedMarker.category]}</span>
                 {selectedMarker.reliabilityScore && selectedMarker.reliabilityScore < 0.5 && (
                   <AlertTriangle className="text-yellow-500" size={20} title="Low reliability" />
                 )}
               </div>
               
-              <div className="space-y-2 text-sm">
-                <div>
+              <div className="space-y-3 text-sm">
+                <div className="text-gray-300">
                   {t.lastConfirmed}: {selectedMarker.lastConfirmed ? 
                     new Date(selectedMarker.lastConfirmed).toLocaleString(language === 'es' ? 'es-ES' : 'en-US') : 
                     'N/A'
                   }
                 </div>
-                <div>
+                <div className="text-gray-300">
                   {t.confirmations}: {selectedMarker.confirmationsCount || 0}
                 </div>
                 {selectedMarker.reliabilityScore && (
-                  <div className="mt-2">
+                  <div className="mt-4">
                     <div className="text-xs text-gray-400 mb-1">Reliability</div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div className="w-full bg-gray-700/50 rounded-full h-2">
                       <div
                         className="bg-blue-600 rounded-full h-2 transition-all duration-300"
                         style={{ width: `${selectedMarker.reliabilityScore * 100}%` }}
@@ -461,13 +520,13 @@ function MapComponent({ language = 'en' }: MapProps) {
                 )}
               </div>
 
-              <div className="mt-4 flex justify-between items-center gap-2">
+              <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleConfirm(selectedMarker.id, true);
                   }}
-                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
                 >
                   {t.stillPresent}
                 </button>
@@ -477,7 +536,7 @@ function MapComponent({ language = 'en' }: MapProps) {
                     e.stopPropagation();
                     handleConfirm(selectedMarker.id, false);
                   }}
-                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                 >
                   {t.notPresent}
                 </button>

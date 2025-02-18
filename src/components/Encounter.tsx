@@ -40,7 +40,7 @@ const Encounter = ({ language = 'en' }: EncounterProps) => {
               : 'Haga clic en los botones para reproducir respuestas pregrabadas en inglés.'}
           </p>
 
-          <AudioPlayer />
+          <AudioPlayer useEncounterStatements={true} language={language} />
         </div>
       </div>
     </div>

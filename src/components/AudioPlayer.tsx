@@ -1,23 +1,42 @@
-import React, { useState, useRef } from 'react';
-import { Play, Volume2, VolumeX } from 'lucide-react';
-import { audioStatements } from '../lib/audioStatements';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
+import { encounterStatements, proofStatements } from '../lib/audioStatements';
 
 interface AudioPlayerProps {
   speakerMode?: boolean;
+  useEncounterStatements?: boolean;
+  language?: 'en' | 'es';
 }
 
-const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
+const AudioPlayer = ({ speakerMode = false, useEncounterStatements = false, language = 'en' }: AudioPlayerProps) => {
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSpeakerMode, setIsSpeakerMode] = useState(speakerMode);
+  const [isApiConfigured, setIsApiConfigured] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const maxRetries = 3;
   const retryDelay = 2000;
 
+  const statements = useEncounterStatements ? encounterStatements : proofStatements;
+
+  useEffect(() => {
+    // Check if ElevenLabs API key is configured
+    const hasApiKey = Boolean(import.meta.env.VITE_ELEVENLABS_API_KEY);
+    setIsApiConfigured(hasApiKey);
+    if (!hasApiKey) {
+      setError('ElevenLabs API key is not configured. Please check your environment variables.');
+    }
+  }, []);
+
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const generateAndPlaySpeech = async (text: string) => {
+    if (!isApiConfigured) {
+      setError('ElevenLabs API is not configured. Please check your environment variables.');
+      return;
+    }
+
     try {
       if (currentPlaying === text) {
         if (audioRef.current) {
@@ -52,7 +71,8 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
           });
 
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
           }
 
           return await response.blob();
@@ -84,7 +104,7 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
       setCurrentPlaying(text);
     } catch (err) {
       console.error('Speech generation error:', err);
-      setError('Failed to generate speech. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to generate speech. Please try again.');
       setCurrentPlaying(null);
     } finally {
       setIsGenerating(false);
@@ -98,18 +118,33 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
     }
   };
 
+  if (!isApiConfigured) {
+    return (
+      <div className="w-full max-w-2xl mt-8">
+        <div className="bg-red-900/50 text-red-100 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+          <AlertTriangle size={20} className="flex-shrink-0" />
+          <span>ElevenLabs API is not configured. Please check your environment variables.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-2xl mt-8">
       {error && (
-        <div className="bg-red-900/50 text-red-100 px-4 py-2 rounded-lg mb-4">
-          {error}
+        <div className="bg-red-900/50 text-red-100 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+          <AlertTriangle size={20} className="flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
       
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-100 flex items-center">
           <Volume2 className="mr-2" />
-          Press play to hear the phrase in English
+          {language === 'es' 
+            ? 'Presiona play para escuchar la frase en inglés'
+            : 'Press play to hear the phrase in English'
+          }
         </h2>
         <button
           onClick={toggleSpeakerMode}
@@ -125,21 +160,22 @@ const AudioPlayer = ({ speakerMode = false }: AudioPlayerProps) => {
       </div>
 
       <div className="grid gap-4">
-        {audioStatements.map((audio) => {
+        {statements.map((audio) => {
           const isPlaying = currentPlaying === audio.text;
           const isDisabled = isGenerating && currentPlaying !== audio.text;
+          const title = language === 'en' ? audio.title.en : audio.title.es;
 
           return (
             <div
-              key={audio.title}
+              key={title}
               className="bg-black/30 backdrop-blur-sm rounded-lg p-4 hover:bg-black/40 transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-100">{audio.title}</h3>
+                  <h3 className="text-lg font-medium text-gray-100">{title}</h3>
                   <p className="text-sm text-gray-400">
                     <Volume2 className="inline-block mr-1" size={14} />
-                    Click to play
+                    {language === 'es' ? 'Clic para reproducir' : 'Click to play'}
                   </p>
                 </div>
                 <button

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Play, Square, Copy, AlertTriangle } from 'lucide-react';
+import { Mic, Play, Square, Copy, AlertTriangle, Database } from 'lucide-react';
 import { translations } from '../translations';
-import { supabase } from '../lib/supabase';
+import { supabase, testSupabaseConnection } from '../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import AudioPlayer from './AudioPlayer';
 
@@ -24,11 +24,36 @@ const Registro = ({ language = 'en' }: RegistroProps) => {
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [sessionId] = useState(() => uuidv4());
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const t = translations[language];
 
+  const checkSupabaseConnection = async () => {
+    try {
+      setIsCheckingConnection(true);
+      const isConnected = await testSupabaseConnection();
+      setIsSupabaseConnected(isConnected);
+      setError(null);
+      
+      if (isConnected) {
+        await fetchRecordings();
+      }
+    } catch (err) {
+      console.error('Supabase connection error:', err);
+      setIsSupabaseConnected(false);
+      setError(language === 'es' 
+        ? 'Error de conexión a la base de datos. Por favor, conecte a Supabase usando el botón "Connect to Supabase".'
+        : 'Database connection error. Please connect to Supabase using the "Connect to Supabase" button.');
+    } finally {
+      setIsCheckingConnection(false);
+    }
+  };
+
   useEffect(() => {
+    checkSupabaseConnection();
+    
     // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -46,9 +71,6 @@ const Registro = ({ language = 'en' }: RegistroProps) => {
         }
       );
     }
-
-    // Load existing recordings for this session
-    fetchRecordings();
   }, []);
 
   const fetchRecordings = async () => {
@@ -70,6 +92,13 @@ const Registro = ({ language = 'en' }: RegistroProps) => {
   };
 
   const startRecording = async () => {
+    if (!isSupabaseConnected) {
+      setError(language === 'es'
+        ? 'Por favor, conecte a Supabase primero'
+        : 'Please connect to Supabase first');
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -156,6 +185,44 @@ const Registro = ({ language = 'en' }: RegistroProps) => {
     }
   };
 
+  if (isCheckingConnection) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-300 animate-pulse">
+          {language === 'es' ? 'Verificando conexión...' : 'Checking connection...'}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSupabaseConnected) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+        <div className="bg-black/40 backdrop-blur-sm rounded-lg p-8 max-w-md w-full">
+          <div className="flex justify-center mb-6 text-blue-500">
+            <Database size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4 text-center">
+            {language === 'es' ? 'Conexión Requerida' : 'Connection Required'}
+          </h2>
+          <p className="text-gray-300 text-center mb-6">
+            {language === 'es'
+              ? 'Por favor, conecte a Supabase usando el botón "Connect to Supabase" en la esquina superior derecha.'
+              : 'Please connect to Supabase using the "Connect to Supabase" button in the top right corner.'}
+          </p>
+          <div className="flex justify-center">
+            <button
+              onClick={checkSupabaseConnection}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-lg font-medium"
+            >
+              {language === 'es' ? 'Reintentar Conexión' : 'Retry Connection'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
@@ -215,7 +282,7 @@ const Registro = ({ language = 'en' }: RegistroProps) => {
           <h2 className="text-xl font-bold text-white mb-6">
             {language === 'en' ? 'Pre-recorded Responses' : 'Respuestas Pregrabadas'}
           </h2>
-          <AudioPlayer speakerMode={true} />
+          <AudioPlayer speakerMode={true} language={language} />
         </div>
 
         {recordings.length > 0 && (
