@@ -8,6 +8,9 @@ import Rights from './components/Rights';
 import Registro from './components/Registro';
 import About from './components/About';
 import News from './components/News';
+import NewsEditor from './components/NewsEditor';
+import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
 
 function App() {
@@ -138,6 +141,15 @@ function App() {
             <Route path="/registro" element={<Registro language={language} />} />
             <Route path="/about" element={<About language={language} />} />
             <Route path="/news" element={<News language={language} />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/news-editor"
+              element={
+                <ProtectedRoute>
+                  <NewsEditor />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </main>
 

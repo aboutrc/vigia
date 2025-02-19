@@ -1,11 +1,41 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
+        cleanupOutdatedCaches: true
+      },
+      manifest: {
+        name: 'VÍGIA',
+        short_name: 'VÍGIA',
+        description: 'Community Map Markers',
+        theme_color: '#000000',
+        background_color: '#000000',
+        display: 'standalone',
+        icons: [
+          {
+            src: '/icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          }
+        ]
+      }
+    })
+  ],
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,
     host: '0.0.0.0',
     open: true,
     cors: {
@@ -47,5 +77,8 @@ export default defineConfig({
     alias: {
       'mapbox-gl': 'maplibre-gl'
     }
+  },
+  build: {
+    sourcemap: true
   }
 });
