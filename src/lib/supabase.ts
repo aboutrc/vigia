@@ -11,7 +11,7 @@ export const supabase = supabaseUrl && supabaseAnonKey ? createClient<Database>(
   {
     auth: {
       persistSession: false,
-      autoRefreshToken: false,
+      autoRefreshToken: true,
       detectSessionInUrl: false
     },
     db: {
@@ -20,8 +20,6 @@ export const supabase = supabaseUrl && supabaseAnonKey ? createClient<Database>(
     global: {
       headers: {
         'X-Client-Info': 'vigia@1.0.0',
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${supabaseAnonKey}`,
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
       }
@@ -41,14 +39,14 @@ export const isSupabaseConfigured = () => {
 // Helper function to test Supabase connection with retries
 export const testSupabaseConnection = async (retryCount = 0, maxRetries = 3) => {
   if (!isSupabaseConfigured()) {
-    console.warn('Supabase is not configured');
+    console.warn('Supabase configuration is missing');
     return false;
   }
 
   try {
     console.info(`Supabase connection attempt ${retryCount + 1}`);
     const { data, error } = await supabase!.from('markers')
-      .select('id, created_at')
+      .select('count')
       .limit(1)
       .maybeSingle();
       

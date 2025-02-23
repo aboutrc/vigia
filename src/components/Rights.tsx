@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { translations } from '../translations';
+import ElevenLabsWidget from './ElevenLabsWidget';
 
 interface RightsProps {
   language?: 'en' | 'es';
 }
 
-interface Section {
-  title: string;
-  content: string[];
-  isCaseLaw?: boolean;
-}
-
 const Rights = ({ language = 'en' }: RightsProps) => {
-  const [expandedSection, setExpandedSection] = useState<number | null>(null);
+  const [expandedSection, setExpandedSection] = useState<number | null>(0); // Set to 0 to auto-expand Tia Maria
   const t = translations[language].rights;
 
-  const sections: Section[] = [
+  const sections = [
+    {
+      title: language === 'es' ? 'Tía María - Asistente de IA' : 'Tia Maria - AI Assistant',
+      content: ['']
+    },
     {
       title: t.sections.constitution.title,
       content: t.sections.constitution.content
@@ -55,33 +54,26 @@ const Rights = ({ language = 'en' }: RightsProps) => {
     for (let i = 0; i < content.length; i++) {
       const line = content[i].trim();
       
-      // Skip empty lines
       if (!line) continue;
 
-      // If line contains "v." and ends with a year in parentheses, it's a title
       if (line.includes('v.') && /\(\d{4}\)/.test(line)) {
-        // If we have a previous case, save it
         if (currentCase.title) {
           cases.push({ ...currentCase });
         }
-        // Start new case
         currentCase = {
           title: line,
           description: '',
           learnMore: ''
         };
       }
-      // If line starts with "Learn more:" or "Más información:", it's a link
       else if (line.startsWith('Learn more:') || line.startsWith('Más información:')) {
         currentCase.learnMore = line.replace(line.startsWith('Learn more:') ? 'Learn more:' : 'Más información:', '').trim();
       }
-      // Otherwise, it's part of the description
       else if (currentCase.title) {
         currentCase.description = line;
       }
     }
 
-    // Add the last case
     if (currentCase.title) {
       cases.push(currentCase);
     }
@@ -115,7 +107,7 @@ const Rights = ({ language = 'en' }: RightsProps) => {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-4">
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-4">
         {sections.map((section, index) => (
           <div
             key={index}
@@ -123,26 +115,38 @@ const Rights = ({ language = 'en' }: RightsProps) => {
           >
             <button
               onClick={() => toggleSection(index)}
-              className="w-full px-4 py-3 flex items-center justify-between text-white hover:bg-black/50 transition-colors"
+              className="w-full px-6 py-4 flex items-center justify-between text-white hover:bg-black/50 transition-colors"
             >
-              <span className="text-base font-medium">{section.title}</span>
+              <span className="text-xl font-bold">{section.title}</span>
               {expandedSection === index ? (
-                <ChevronDown size={20} />
+                <ChevronDown size={24} />
               ) : (
-                <ChevronRight size={20} />
+                <ChevronRight size={24} />
               )}
             </button>
             
             {expandedSection === index && (
-              <div className="px-4 pb-4">
-                {section.isCaseLaw ? (
+              <div className="px-6 pb-6">
+                {index === 0 ? (
+                  <>
+                    <p className="text-gray-300 mb-6">
+                      {language === 'es' 
+                        ? 'Ahora puedes tener una conversación con la IA y hacer cualquier pregunta que tengas sobre tus derechos y ICE. Esta IA utiliza información del sitio web de la ACLU para asegurarse de que tengas la información más precisa posible.'
+                        : 'You can now have a conversation with AI and ask any questions you may have about your rights and ICE. This AI is using information from the ACLU website to make sure you have the most accurate information possible.'
+                      }
+                    </p>
+                    <div className="h-[500px]">
+                      <ElevenLabsWidget />
+                    </div>
+                  </>
+                ) : section.isCaseLaw ? (
                   renderCaseLawContent(section.content)
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {section.content.map((text, i) => (
-                      <p key={i} className="text-gray-300">
+                      <div key={i} className="text-gray-300">
                         {text}
-                      </p>
+                      </div>
                     ))}
                   </div>
                 )}

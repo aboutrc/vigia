@@ -156,3 +156,25 @@
     background-color: white !important;
   }
 }
+
+/* ElevenLabs Widget Global Styles */
+._wrapper_me40k_16 {
+  margin-top: 20px !important;
+  flex-direction: column-reverse !important;
+  align-items: flex-end !important;
+  gap: 16px !important;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif !important;
+}
+
+elevenlabs-convai {
+  position: static !important;
+  width: 100% !important;
+  height: 500px !important;
+  display: block !important;
+}
+
+.convai-chat-button {
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  right: auto !important;
+}
