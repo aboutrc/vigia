@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = 'https://opzqmoaimiqiiflivqtq.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wenFtb2FpbWlxaWlmbGl2cXRxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM4Nzk4NywiZXhwIjoyMDUzOTYzOTg3fQ.I6Hm_qI1iUNrAM8WFQbjHDK3ZCGRp7AQwk_KQlPRIPI';
 
 // Create Supabase client with proper configuration
-export const supabase = supabaseUrl && supabaseAnonKey ? createClient<Database>(
+export const supabase = createClient<Database>(
   supabaseUrl,
   supabaseAnonKey,
   {
@@ -25,13 +25,13 @@ export const supabase = supabaseUrl && supabaseAnonKey ? createClient<Database>(
       }
     }
   }
-) : null;
+);
 
 // Helper function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
   const hasConfig = Boolean(supabaseUrl && supabaseAnonKey && supabase);
   if (!hasConfig) {
-    console.warn('Supabase configuration is missing. Please check your environment variables.');
+    console.warn('Supabase configuration is missing');
   }
   return hasConfig;
 };
@@ -45,7 +45,8 @@ export const testSupabaseConnection = async (retryCount = 0, maxRetries = 3) => 
 
   try {
     console.info(`Supabase connection attempt ${retryCount + 1}`);
-    const { data, error } = await supabase!.from('markers')
+    const { data, error } = await supabase
+      .from('markers')
       .select('count')
       .limit(1)
       .maybeSingle();

@@ -12,6 +12,7 @@ import NewsEditor from './components/NewsEditor';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 function App() {
   const [language, setLanguage] = useState<'en' | 'es'>('en');
@@ -42,7 +43,7 @@ function App() {
     <Router>
       <div className="min-h-screen flex flex-col bg-gray-900">
         <header className="fixed top-0 left-0 right-0 z-50 bg-black shadow-lg">
-          {/* Top bar with logo and language toggle */}
+          {/* Header content remains the same */}
           <div className="h-16 flex items-center justify-between px-4">
             <button
               onClick={toggleLanguage}
@@ -154,6 +155,7 @@ function App() {
         </main>
 
         <Footer />
+        <PWAInstallPrompt language={language} />
       </div>
     </Router>
   );

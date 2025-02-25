@@ -6,11 +6,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
-        cleanupOutdatedCaches: true
-      },
+      registerType: 'prompt',
+      includeAssets: ['logo.svg', 'logo.png', 'audio/*.mp3'],
       manifest: {
         name: 'VÍGIA',
         short_name: 'VÍGIA',
@@ -18,18 +15,52 @@ export default defineConfig({
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: '/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
             src: '/icon-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ],
+        categories: ['utilities', 'social'],
+        shortcuts: [
+          {
+            name: 'Map',
+            url: '/map',
+            icons: [{ src: '/icon-192x192.png', sizes: '192x192' }]
           }
         ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\.mapbox\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mapbox-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              }
+            }
+          }
+        ],
+        cleanupOutdatedCaches: true,
+        sourcemap: true
+      },
+      devOptions: {
+        enabled: false // Disable PWA in development
       }
     })
   ],
